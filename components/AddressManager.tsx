@@ -233,26 +233,15 @@ export default function AddressManager({
   if (isAddingAddress) {
     return (
       <View style={styles.container}>
-        <View style={styles.formHeader}>
-          <Text style={styles.formTitle}>
-            {editingAddress ? 'Edit Address' : 'Add New Address'}
-          </Text>
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => {
-              setIsAddingAddress(false);
-              setEditingAddress(null);
-            }}
-          >
-            <Ionicons name="close" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
+
         
-        <AddressAutocomplete
-          initialAddress={editingAddress || undefined}
-          onAddressSelected={handleSaveAddress}
-          required
-        />
+        <View style={styles.autocompleteWrapper}>
+          <AddressAutocomplete
+            initialAddress={editingAddress || undefined}
+            onAddressSelected={handleSaveAddress}
+            required
+          />
+        </View>
         
         <TouchableOpacity 
           style={styles.saveButton}
@@ -260,7 +249,7 @@ export default function AddressManager({
             if (editingAddress) {
               handleSaveAddress(editingAddress);
             } else {
-              Alert.alert('Error', 'Please select an address using the autocomplete.');
+              Alert.alert('Error', 'Please select an address using the autocomplete or fill in the address fields.');
             }
           }}
           disabled={loading}
@@ -433,14 +422,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    zIndex: 50,
   },
   formTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
   },
+  formDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+  },
   closeButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
   },
   saveButton: {
     backgroundColor: '#007AFF',
@@ -449,10 +446,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
+    zIndex: 50,
   },
   saveButtonText: {
     color: 'white',
     fontWeight: '500',
     fontSize: 16,
+  },
+  autocompleteWrapper: {
+    minHeight: 250, // Add fixed height to contain autocomplete dropdown
+    zIndex: 100,    // Ensure higher z-index for dropdown
+    width: '100%',
   },
 }); 

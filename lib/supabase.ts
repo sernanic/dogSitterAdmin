@@ -58,6 +58,8 @@ export interface Address {
   country?: string;
   latitude?: number;
   longitude?: number;
+  // PostgreSQL point type - when retrieved it's an array, but when sending we use a string
+  location?: string | [number, number];
   is_primary: boolean;
   created_at: string;
   updated_at: string;
@@ -248,27 +250,47 @@ export const getPrimaryAddress = async (profileId: string): Promise<Address | nu
 
 export const upsertAddress = async (address: Partial<Address>): Promise<Address> => {
   try {
+    // Prepare the address data for saving
+    const addressToSave: any = { ...address };
+    
+    // Handle the point location
+    delete addressToSave.location;
+    
+    // Add the location point if we have latitude and longitude
+    if (addressToSave.latitude !== undefined && addressToSave.longitude !== undefined) {
+      // For PostgreSQL point type, we use a string in the format '(x,y)'
+      addressToSave.location = `(${addressToSave.longitude},${addressToSave.latitude})`;
+    }
+    
     // If updating an existing address
     if (address.id) {
       const { data, error } = await supabase
         .from('addresses')
-        .update(address)
+        .update(addressToSave)
         .eq('id', address.id)
         .select()
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating address:', error);
+        throw error;
+      }
+      
       return data as Address;
     } 
     // Creating a new address
     else {
       const { data, error } = await supabase
         .from('addresses')
-        .insert(address)
+        .insert(addressToSave)
         .select()
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting address:', error);
+        throw error;
+      }
+      
       return data as Address;
     }
   } catch (error) {

@@ -150,6 +150,14 @@ export default function AddressAutocomplete({
     onAddressSelected(newAddress);
   };
 
+  // Call onAddressSelected when exiting the manual form to ensure the parent component has the latest data
+  const handleManualEntrySubmit = () => {
+    if (address.formatted_address || address.street_address) {
+      onAddressSelected(address);
+    }
+    setManualMode(false);
+  };
+
   return (
     <View style={styles.container}>
       {label && (
@@ -190,6 +198,7 @@ export default function AddressAutocomplete({
                 container: {
                   flex: 0,
                   width: '100%',
+                  zIndex: 200,
                 },
                 textInputContainer: {
                   width: '100%',
@@ -217,6 +226,7 @@ export default function AddressAutocomplete({
                   borderRadius: 8,
                   elevation: 5,
                   zIndex: 1000,
+                  maxHeight: 200,
                 },
                 row: {
                   padding: 15,
@@ -245,9 +255,9 @@ export default function AddressAutocomplete({
               keyboardShouldPersistTaps="handled"
               listViewDisplayed="auto"
               renderRow={(data) => (
-                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', padding: 14}}>
                   <FontAwesome name="map-marker" size={16} color="#4B5563" style={{marginRight: 10}} />
-                  <Text style={{fontSize: 16}}>{data.description}</Text>
+                  <Text style={{fontSize: 16, color: '#333'}}>{data.description}</Text>
                 </View>
               )}
             />
@@ -325,7 +335,10 @@ export default function AddressAutocomplete({
             </View>
           </View>
 
-          <TouchableOpacity style={styles.manualButton} onPress={toggleManualMode}>
+          <TouchableOpacity style={styles.manualButton} onPress={() => {
+            handleManualEntrySubmit();
+            toggleManualMode();
+          }}>
             <Text style={styles.manualButtonText}>Use Autocomplete</Text>
           </TouchableOpacity>
         </View>
@@ -354,10 +367,10 @@ const styles = StyleSheet.create({
     color: 'red',
   },
   autocompleteContainer: {
-    flex: 1,
     position: 'relative',
     zIndex: 999,
-    minHeight: 50,
+    minHeight: 150,
+    marginBottom: 50,
   },
   textInputContainer: {
     backgroundColor: 'white',
@@ -396,14 +409,23 @@ const styles = StyleSheet.create({
   manualButton: {
     marginTop: 12,
     alignSelf: 'flex-end',
+    backgroundColor: '#f3f4f6',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
   },
   manualButtonText: {
     color: '#4B5563',
     fontSize: 14,
-    textDecorationLine: 'underline',
+    fontWeight: '500',
   },
   manualContainer: {
     width: '100%',
+    backgroundColor: '#f9fafb',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   formField: {
     marginBottom: 12,
@@ -427,7 +449,7 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 45,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#ffffff',
     borderRadius: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -441,13 +463,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   warningContainer: {
-    backgroundColor: '#FFE5E5',
+    backgroundColor: '#FEF2F2',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   warningText: {
-    color: '#D32F2F',
+    color: '#B91C1C',
     fontSize: 14,
   },
   loader: {

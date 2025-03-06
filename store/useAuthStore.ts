@@ -11,7 +11,7 @@ interface User {
   email: string;
   role: UserRole;
   avatar_url?: string;
-  phone?: string;
+  phoneNumber?: string;
   location?: string;
 }
 
@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthState>()(
               email: data.user.email || '',
               role: 'sitter', // Always enforce sitter role
               avatar_url: profile.avatar_url || '',
-              phone: profile.phone || '',
+              phoneNumber: profile.phoneNumber || '',
               location: profile.location || '',
             },
             token: data.session?.access_token || null,
@@ -140,7 +140,7 @@ export const useAuthStore = create<AuthState>()(
                 role: 'sitter',
                 name,
                 email: data.user.email,
-                phone: '',
+                phoneNumber: '',
                 location: '',
                 updated_at: new Date().toISOString()
               })
@@ -182,7 +182,7 @@ export const useAuthStore = create<AuthState>()(
                   email: data.user.email || '',
                   role: 'sitter',
                   avatar_url: profile.avatar_url || '',
-                  phone: profile.phone || '',
+                  phoneNumber: profile.phoneNumber || '',
                   location: profile.location || '',
                 },
                 token: data.session.access_token,
@@ -234,7 +234,7 @@ export const useAuthStore = create<AuthState>()(
             name: userData.name,
             role: userData.role,
             avatar_url: userData.avatar_url,
-            phone: userData.phone,
+            phoneNumber: userData.phoneNumber,
             location: userData.location,
           }).eq('id', currentState.user.id);
           
@@ -335,7 +335,7 @@ export const useAuthStore = create<AuthState>()(
                     email: user.email || '',
                     role: profile.role || 'sitter',
                     avatar_url: profile.avatar_url || '',
-                    phone: profile.phone || '',
+                    phoneNumber: profile.phoneNumber || '',
                     location: profile.location || '',
                   },
                   token: data.session.access_token,
@@ -355,7 +355,7 @@ export const useAuthStore = create<AuthState>()(
                       email: user.email || '',
                       role: 'sitter', // Default role
                       avatar_url: '', // Remove reference to non-existent profile
-                      phone: '',
+                      phoneNumber: '',
                       location: '',
                     },
                     token: data.session.access_token,
