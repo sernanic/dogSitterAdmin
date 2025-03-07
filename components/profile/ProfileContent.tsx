@@ -10,6 +10,7 @@ import LogoutButton from './LogoutButton';
 import VersionInfo from './VersionInfo';
 import EditProfileModal from './EditProfileModal';
 import AddressManagerModal from './AddressManagerModal';
+import AvailabilityManagerModal from './AvailabilityManagerModal';
 import EventRegister from '../../utils/EventRegister';
 import { getPrimaryAddress } from '../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
@@ -28,6 +29,7 @@ interface ExtendedUser {
 const ProfileContent = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
+  const [isAvailabilityModalVisible, setIsAvailabilityModalVisible] = useState(false);
   const [primaryAddress, setPrimaryAddress] = useState<any>(null);
   const [editProfileForm, setEditProfileForm] = useState({
     name: '',
@@ -300,6 +302,7 @@ const ProfileContent = () => {
         {/* Account Settings */}
         <AccountSettings
           onAddressPress={() => setIsAddressModalVisible(true)}
+          onAvailabilityPress={() => setIsAvailabilityModalVisible(true)}
         />
         
         {/* Logout Button */}
@@ -327,6 +330,16 @@ const ProfileContent = () => {
         onAddressSelected={(address) => {
           // Refresh primary address when an address is selected/changed
           loadPrimaryAddress();
+        }}
+      />
+
+      {/* Availability Manager Modal */}
+      <AvailabilityManagerModal
+        isVisible={isAvailabilityModalVisible}
+        onClose={() => setIsAvailabilityModalVisible(false)}
+        onAvailabilityUpdated={() => {
+          // Optional: Handle availability updates if needed
+          console.log('Availability updated successfully');
         }}
       />
     </>
