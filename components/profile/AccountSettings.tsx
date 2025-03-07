@@ -6,9 +6,10 @@ import EventRegister from '../../utils/EventRegister';
 interface AccountSettingsProps {
   onAddressPress: () => void;
   onAvailabilityPress: () => void;
+  onUnavailabilityPress: () => void;
 }
 
-const AccountSettings = ({ onAddressPress, onAvailabilityPress }: AccountSettingsProps) => {
+const AccountSettings = ({ onAddressPress, onAvailabilityPress, onUnavailabilityPress }: AccountSettingsProps) => {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Account Settings</Text>
@@ -37,6 +38,15 @@ const AccountSettings = ({ onAddressPress, onAvailabilityPress }: AccountSetting
       >
         <MaterialCommunityIcons name="clock-outline" size={24} color="#666" />
         <Text style={styles.settingText}>Set Availability</Text>
+        <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.settingItem}
+        onPress={onUnavailabilityPress}
+      >
+        <MaterialCommunityIcons name="calendar-remove" size={24} color="#666" />
+        <Text style={styles.settingText}>Set Unavailability</Text>
         <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
       </TouchableOpacity>
 

@@ -65,6 +65,14 @@ export interface Address {
   updated_at: string;
 }
 
+// Types for sitter unavailability table
+export interface SitterUnavailability {
+  id: string;
+  sitter_id: string;
+  unavailable_date: string; // ISO format YYYY-MM-DD
+  created_at: string;
+}
+
 // Helper function to upsert profile data
 export const upsertProfile = async (profile: Partial<Profile>) => {
   try {
@@ -317,6 +325,168 @@ export const setPrimaryAddress = async (addressId: string, profileId: string): P
     if (error) throw error;
   } catch (error) {
     console.error('Error setting primary address:', error);
+    throw error;
+  }
+};
+
+// Helper function to get all unavailable dates for a sitter
+export const getSitterUnavailableDates = async (sitterId: string): Promise<SitterUnavailability[]> => {
+  try {
+    console.log('[getSitterUnavailableDates] Starting fetch for sitter:', sitterId);
+    
+    // Verify the sitter_unavailability table exists
+    console.log('[getSitterUnavailableDates] Checking if table exists...');
+    
+    try {
+      // First just get count to check table access
+      const { count, error: countError } = await supabase
+        .from('sitter_unavailability')
+        .select('*', { count: 'exact', head: true })
+        .eq('sitter_id', sitterId);
+        
+      if (countError) {
+        console.error('[getSitterUnavailableDates] Error checking table:', countError);
+        
+        // Table might not exist, return empty array
+        if (countError.code === '42P01') { // undefined_table
+          console.error('[getSitterUnavailableDates] Table does not exist');
+          return [];
+        }
+        
+        // Other permission error
+        throw countError;
+      }
+      
+      console.log(`[getSitterUnavailableDates] Found ${count} records for sitter`);
+    } catch (checkError) {
+      console.error('[getSitterUnavailableDates] Error checking table existence:', checkError);
+      // Continue with main query anyway
+    }
+    
+    // Now make the actual query
+    const { data, error } = await supabase
+      .from('sitter_unavailability')
+      .select('*')
+      .eq('sitter_id', sitterId);
+      
+    if (error) {
+      console.error('[getSitterUnavailableDates] Query error:', error);
+      throw error;
+    }
+    
+    console.log(`[getSitterUnavailableDates] Successfully fetched ${data?.length || 0} unavailable dates`);
+    return data as SitterUnavailability[];
+  } catch (error) {
+    console.error('[getSitterUnavailableDates] Fatal error:', error);
+    // Return empty array instead of throwing, to prevent UI from hanging
+    return [];
+  }
+};
+
+// Helper function to add an unavailable date for a sitter
+export const addSitterUnavailableDate = async (sitterId: string, unavailableDate: string): Promise<SitterUnavailability> => {
+  try {
+    console.log(`Adding unavailable date for sitter ${sitterId}: ${unavailableDate}`);
+    
+    const { data, error } = await supabase
+      .from('sitter_unavailability')
+      .insert({
+        sitter_id: sitterId,
+        unavailable_date: unavailableDate
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Error adding unavailable date:', error);
+      throw error;
+    }
+    
+    console.log('Successfully added unavailable date:', data);
+    return data as SitterUnavailability;
+  } catch (error) {
+    console.error('Error in addSitterUnavailableDate:', error);
+    throw error;
+  }
+};
+
+// Helper function to delete an unavailable date for a sitter
+export const deleteSitterUnavailableDate = async (sitterId: string, unavailableDate: string): Promise<void> => {
+  try {
+    console.log(`Deleting unavailable date for sitter ${sitterId}: ${unavailableDate}`);
+    
+    const { error } = await supabase
+      .from('sitter_unavailability')
+      .delete()
+      .eq('sitter_id', sitterId)
+      .eq('unavailable_date', unavailableDate);
+      
+    if (error) {
+      console.error('Error deleting unavailable date:', error);
+      throw error;
+    }
+    
+    console.log('Successfully deleted unavailable date');
+  } catch (error) {
+    console.error('Error in deleteSitterUnavailableDate:', error);
+    throw error;
+  }
+};
+
+// Helper function to check if a sitter is available on a specific date
+export const checkSitterAvailabilityForDate = async (sitterId: string, date: string): Promise<boolean> => {
+  try {
+    console.log(`Checking availability for sitter ${sitterId} on date ${date}`);
+    
+    // First check if the date is marked as unavailable
+    const { data, error } = await supabase
+      .from('sitter_unavailability')
+      .select('*')
+      .eq('sitter_id', sitterId)
+      .eq('unavailable_date', date);
+      
+    if (error) {
+      console.error('Error checking unavailability:', error);
+      throw error;
+    }
+    
+    // If we have an unavailability record, the sitter is not available
+    if (data && data.length > 0) {
+      console.log('Sitter is marked as unavailable on this date');
+      return false;
+    }
+    
+    // Otherwise, check if they have weekly availability for this day of the week
+    // This would involve checking the sitter_weekly_availability table
+    // ...
+    
+    // For now, assume they're available if not marked as unavailable
+    console.log('Sitter appears to be available on this date');
+    return true;
+  } catch (error) {
+    console.error('Error in checkSitterAvailabilityForDate:', error);
+    throw error;
+  }
+};
+
+// Helper function to clear all unavailable dates for a sitter
+export const clearSitterUnavailableDates = async (sitterId: string): Promise<void> => {
+  try {
+    console.log(`Clearing all unavailable dates for sitter ${sitterId}`);
+    
+    const { error } = await supabase
+      .from('sitter_unavailability')
+      .delete()
+      .eq('sitter_id', sitterId);
+      
+    if (error) {
+      console.error('Error clearing unavailable dates:', error);
+      throw error;
+    }
+    
+    console.log('Successfully cleared all unavailable dates');
+  } catch (error) {
+    console.error('Error in clearSitterUnavailableDates:', error);
     throw error;
   }
 }; 

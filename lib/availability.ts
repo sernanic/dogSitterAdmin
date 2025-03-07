@@ -345,7 +345,7 @@ export async function getDirectSitterAvailability(userId: string) {
         availability[day].push({
           id: item.id || Math.random().toString(36).substring(2, 9),
           start: item.start_time ? item.start_time.slice(0, 5) : '09:00',
-          end: item.end_time ? item.end_time.slice(0, 5) : '17:00'
+          end: item.end_time ? item.end_time.slice(0, 5) : '19:00'
         });
       });
     } else {
@@ -443,4 +443,82 @@ export async function debugAvailabilityTables(userId: string) {
     console.error('Debug error:', error);
     return { error };
   }
+}
+
+/**
+ * Removes duplicate time slots that have the exact same start and end times
+ * This is useful when comparing what's already saved versus what's being edited
+ */
+export function removeDuplicateTimeSlots(existingSlots: TimeSlot[], newSlots: TimeSlot[]): TimeSlot[] {
+  // If there are no existing slots, return all new slots
+  if (!existingSlots || existingSlots.length === 0) {
+    return newSlots;
+  }
+  
+  // If there are no new slots, return empty array
+  if (!newSlots || newSlots.length === 0) {
+    return [];
+  }
+  
+  // Filter out any new slots that exactly match an existing slot's time range
+  return newSlots.filter(newSlot => {
+    // Check if this new slot exactly matches any existing slot
+    const exactMatch = existingSlots.some(existingSlot => 
+      existingSlot.start === newSlot.start && 
+      existingSlot.end === newSlot.end
+    );
+    
+    // Return false to filter out exact matches (since they don't need to be inserted again)
+    return !exactMatch;
+  });
+}
+
+/**
+ * Identifies which slots were modified by comparing original slots with updated slots
+ * @returns An object containing added, modified, and removed slots
+ */
+export function identifyChangedTimeSlots(
+  originalSlots: TimeSlot[], 
+  updatedSlots: TimeSlot[]
+): {
+  added: TimeSlot[],
+  modified: TimeSlot[],
+  unchanged: TimeSlot[],
+  removed: TimeSlot[]
+} {
+  // Initialize result containers
+  const added: TimeSlot[] = [];
+  const modified: TimeSlot[] = [];
+  const unchanged: TimeSlot[] = [];
+  const removed: TimeSlot[] = [];
+  
+  // Find added and modified slots
+  updatedSlots.forEach(updatedSlot => {
+    // Look for a slot with same ID in the original slots
+    const originalSlot = originalSlots.find(origSlot => origSlot.id === updatedSlot.id);
+    
+    if (!originalSlot) {
+      // This is a completely new slot
+      added.push(updatedSlot);
+    } else if (
+      originalSlot.start !== updatedSlot.start || 
+      originalSlot.end !== updatedSlot.end
+    ) {
+      // This is a modified slot (same ID but different times)
+      modified.push(updatedSlot);
+    } else {
+      // This slot wasn't changed
+      unchanged.push(updatedSlot);
+    }
+  });
+  
+  // Find removed slots (in original but not in updated)
+  originalSlots.forEach(originalSlot => {
+    const stillExists = updatedSlots.some(updatedSlot => updatedSlot.id === originalSlot.id);
+    if (!stillExists) {
+      removed.push(originalSlot);
+    }
+  });
+  
+  return { added, modified, unchanged, removed };
 } 

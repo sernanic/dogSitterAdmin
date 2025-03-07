@@ -11,6 +11,7 @@ import VersionInfo from './VersionInfo';
 import EditProfileModal from './EditProfileModal';
 import AddressManagerModal from './AddressManagerModal';
 import AvailabilityManagerModal from './AvailabilityManagerModal';
+import UnavailabilityManagerModal from './UnavailabilityManagerModal';
 import EventRegister from '../../utils/EventRegister';
 import { getPrimaryAddress } from '../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
@@ -30,6 +31,7 @@ const ProfileContent = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAvailabilityModalVisible, setIsAvailabilityModalVisible] = useState(false);
+  const [isUnavailabilityModalVisible, setIsUnavailabilityModalVisible] = useState(false);
   const [primaryAddress, setPrimaryAddress] = useState<any>(null);
   const [editProfileForm, setEditProfileForm] = useState({
     name: '',
@@ -277,6 +279,12 @@ const ProfileContent = () => {
     }
   };
 
+  // Add new function to handle availability updates
+  const handleUnavailabilityUpdated = () => {
+    // Refresh profile data if needed
+    loadPrimaryAddress();
+  };
+
   if (!user?.name || !user?.email || !user?.role) return null;
 
   return (
@@ -303,6 +311,7 @@ const ProfileContent = () => {
         <AccountSettings
           onAddressPress={() => setIsAddressModalVisible(true)}
           onAvailabilityPress={() => setIsAvailabilityModalVisible(true)}
+          onUnavailabilityPress={() => setIsUnavailabilityModalVisible(true)}
         />
         
         {/* Logout Button */}
@@ -341,6 +350,13 @@ const ProfileContent = () => {
           // Optional: Handle availability updates if needed
           console.log('Availability updated successfully');
         }}
+      />
+
+      {/* Unavailability Modal */}
+      <UnavailabilityManagerModal
+        isVisible={isUnavailabilityModalVisible}
+        onClose={() => setIsUnavailabilityModalVisible(false)}
+        onUnavailabilityUpdated={handleUnavailabilityUpdated}
       />
     </>
   );

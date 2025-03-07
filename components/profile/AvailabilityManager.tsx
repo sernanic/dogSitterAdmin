@@ -75,6 +75,12 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
   // Additional state for Android time picker
   const [androidTimePickerVisible, setAndroidTimePickerVisible] = useState(false);
 
+  // Add state to track which slots were modified
+  const [modifiedSlots, setModifiedSlots] = useState<Record<string, Set<string>>>({});
+
+  // Add another state to track new slots
+  const [newSlots, setNewSlots] = useState<Record<string, Set<string>>>({});
+
   // Load availability data from backend
   useEffect(() => {
     if (user?.id) {
@@ -105,7 +111,7 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
     setExpandedDay(expandedDay === day ? null : day);
   };
 
-  const addTimeSlot = (day: string, start = '09:00', end = '17:00') => {
+  const addTimeSlot = (day: string, start = '09:00', end = '19:00') => {
     const newSlot = {
       id: Math.random().toString(36).substring(2, 9),
       start,
@@ -140,6 +146,14 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
             return d;
           }
 
+          // Mark this as a new slot
+          const daySet = new Set(newSlots[day] || []);
+          daySet.add(newSlot.id);
+          setNewSlots(prev => ({
+            ...prev,
+            [day]: daySet
+          }));
+
           const updatedSlots = [...d.timeSlots, newSlot];
           return {
             ...d,
@@ -152,6 +166,26 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
   };
 
   const removeTimeSlot = (day: string, slotId: string) => {
+    // Remove from tracking if it's a modified or new slot
+    if (modifiedSlots[day]?.has(slotId)) {
+      const updatedModified = new Set(modifiedSlots[day]);
+      updatedModified.delete(slotId);
+      setModifiedSlots(prev => ({
+        ...prev,
+        [day]: updatedModified
+      }));
+    }
+    
+    if (newSlots[day]?.has(slotId)) {
+      const updatedNew = new Set(newSlots[day]);
+      updatedNew.delete(slotId);
+      setNewSlots(prev => ({
+        ...prev,
+        [day]: updatedNew
+      }));
+    }
+    
+    // Remove the slot from day availability
     setDayAvailability(prev => 
       prev.map(d => {
         if (d.day === day) {
@@ -199,6 +233,14 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
                 return slot; // Keep the original slot if there's an overlap
               }
 
+              // Mark the slot as modified by tracking it
+              const daySet = new Set(modifiedSlots[day] || []);
+              daySet.add(slotId);
+              setModifiedSlots(prev => ({
+                ...prev,
+                [day]: daySet
+              }));
+
               return updatedSlot;
             }
             return slot;
@@ -212,6 +254,32 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
         return d;
       })
     );
+  };
+
+  // Update the getSlotStyle and getSlotStatusText functions to handle new slots
+  const getSlotStyle = (day: string, slotId: string) => {
+    // Check if this slot is marked as modified or new
+    const isModified = modifiedSlots[day]?.has(slotId);
+    const isNew = newSlots[day]?.has(slotId);
+    
+    if (isNew) {
+      return {...styles.timeSlot, borderLeftColor: '#4CAF50'};  // Green for new
+    } else if (isModified) {
+      return {...styles.timeSlot, borderLeftColor: '#FFA726'};  // Orange for modified
+    } else {
+      return styles.timeSlot;  // Default style
+    }
+  };
+
+  const getSlotStatusText = (day: string, slotId: string) => {
+    // Check if this slot is marked as modified or new
+    if (newSlots[day]?.has(slotId)) {
+      return ' (New)';
+    } else if (modifiedSlots[day]?.has(slotId)) {
+      return ' (Edited)';
+    } else {
+      return '';
+    }
   };
 
   const handleSaveAvailability = async () => {
@@ -333,7 +401,7 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
       const newSlot = {
         id: Math.random().toString(36).substring(2, 9),
         start: timePickerMode === 'start' ? timeString : '09:00',
-        end: timePickerMode === 'end' ? timeString : '17:00'
+        end: timePickerMode === 'end' ? timeString : '19:00'
       };
       
       setDayAvailability(prev => 
@@ -411,7 +479,7 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
             ) : (
               <View style={styles.timeSlotsList}>
                 {item.timeSlots.map(slot => (
-                  <View key={slot.id} style={styles.timeSlot}>
+                  <View key={slot.id} style={getSlotStyle(item.day, slot.id)}>
                     <TouchableOpacity 
                       style={styles.timeButton}
                       onPress={() => openTimePicker(item.day, slot.id, 'start')}
@@ -427,6 +495,10 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
                     >
                       <Text style={styles.timeText}>{formatTime(slot.end)}</Text>
                     </TouchableOpacity>
+                    
+                    <Text style={styles.statusText}>
+                      {getSlotStatusText(item.day, slot.id)}
+                    </Text>
                     
                     <TouchableOpacity 
                       style={styles.deleteButton}
@@ -618,6 +690,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  statusText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#FFA726',
+    marginLeft: 4,
   },
 });
 

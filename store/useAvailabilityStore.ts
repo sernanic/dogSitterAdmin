@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { getDirectSitterAvailability } from '../lib/availability';
+import { 
+  getDirectSitterAvailability, 
+  identifyChangedTimeSlots
+} from '../lib/availability';
 
 // Create a simple debounce utility for API calls
 // This is more reliable than a simple flag
@@ -132,31 +135,36 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
     }
   },
   
-  saveAvailability: async (userId, availability) => {
+  saveAvailability: async (userId, updatedAvailability) => {
     try {
       set({ isLoading: true, error: null });
-      console.log('[Store] Starting availability save process...');
+      console.log('[Store] Starting optimized availability save process...');
       
-      // Delete all existing slots for the user FIRST and wait for it to complete
-      console.log('[Store] Deleting existing availability records...');
-      const { error: deleteError } = await supabase
-        .from('sitter_weekly_availability')
-        .delete()
-        .eq('sitter_id', userId);
+      // First, fetch the current availability from database to compare
+      console.log('[Store] Fetching current availability for comparison...');
+      const { data: currentAvailability, error: fetchError } = await getDirectSitterAvailability(userId);
       
-      if (deleteError) {
-        console.error('[Store] Error deleting existing slots:', deleteError);
-        throw deleteError;
+      if (fetchError) {
+        console.error('[Store] Error fetching current availability:', fetchError);
+        throw fetchError;
       }
       
-      console.log('[Store] Successfully deleted existing records, now adding new ones');
+      // Process each day with a smarter strategy
+      const dayPromises = [];
       
-      // After deletion completes, insert new slots for each day
-      const insertPromises = [];
-      
-      // Then insert new slots for each day
-      for (const [dayName, slots] of Object.entries(availability)) {
-        if (!slots || slots.length === 0) continue;
+      for (const dayName of Object.keys(updatedAvailability)) {
+        const dayKey = dayName.toLowerCase();
+        const updatedSlots = updatedAvailability[dayKey as keyof typeof updatedAvailability] || [];
+        
+        // Safely access current slots with type checking
+        const currentSlots = currentAvailability && 
+          dayKey in currentAvailability ? 
+          (currentAvailability as any)[dayKey] || [] : 
+          [];
+        
+        // Analyze what changed between current and updated slots
+        const changes = identifyChangedTimeSlots(currentSlots, updatedSlots);
+        console.log(`[Store] Day ${dayName}: ${changes.added.length} added, ${changes.modified.length} modified, ${changes.removed.length} removed, ${changes.unchanged.length} unchanged`);
         
         // Map day names to weekday numbers (1-7, where 1 is Monday and 7 is Sunday)
         const dayMap: Record<string, number> = {
@@ -169,16 +177,41 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
           sunday: 7
         };
         
-        const dayNumber = dayMap[dayName.toLowerCase()];
+        const dayNumber = dayMap[dayKey];
         if (!dayNumber) {
           console.warn(`[Store] Invalid day name: ${dayName}, skipping`);
           continue;
         }
         
-        console.log(`[Store] Adding ${slots.length} slots for ${dayName} (day ${dayNumber})`);
+        // Step 1: Delete removed slots
+        if (changes.removed.length > 0) {
+          for (const slot of changes.removed) {
+            const deletePromise = supabase
+              .from('sitter_weekly_availability')
+              .delete()
+              .eq('id', slot.id)
+              .eq('sitter_id', userId);
+            
+            dayPromises.push(deletePromise);
+          }
+        }
         
-        // For each slot in the day
-        for (const slot of slots) {
+        // Step 2: Delete modified slots (we'll re-add them with new times)
+        if (changes.modified.length > 0) {
+          for (const slot of changes.modified) {
+            const deletePromise = supabase
+              .from('sitter_weekly_availability')
+              .delete()
+              .eq('id', slot.id)
+              .eq('sitter_id', userId);
+            
+            dayPromises.push(deletePromise);
+          }
+        }
+        
+        // Step 3: Add new slots and re-add modified slots
+        const slotsToAdd = [...changes.added, ...changes.modified];
+        for (const slot of slotsToAdd) {
           const insertPromise = supabase.rpc('insert_sitter_weekly_availability', {
             p_sitter_id: userId,
             p_weekday: dayNumber,
@@ -186,24 +219,24 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
             p_end_time: `${slot.end}:00`,
           });
           
-          insertPromises.push(insertPromise);
+          dayPromises.push(insertPromise);
         }
       }
       
-      // Now wait for all insert operations to complete
-      console.log(`[Store] Executing ${insertPromises.length} insert operations...`);
-      const results = await Promise.all(insertPromises);
+      // Now execute all the operations
+      console.log(`[Store] Executing ${dayPromises.length} database operations...`);
+      const results = await Promise.all(dayPromises);
       
-      // Check for insert errors
-      const insertErrors = results.filter(result => result.error);
-      if (insertErrors.length > 0) {
-        console.error('[Store] Errors during insert operations:', insertErrors);
-        throw insertErrors[0].error;
+      // Check for errors
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        console.error('[Store] Errors during operations:', errors);
+        throw errors[0].error;
       }
       
       // Update local state
       console.log('[Store] All operations completed successfully');
-      set({ availability, isLoading: false, lastFetchedId: userId });
+      set({ availability: updatedAvailability, isLoading: false, lastFetchedId: userId });
       
       return { success: true };
     } catch (error: any) {
