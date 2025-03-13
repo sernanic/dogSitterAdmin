@@ -1,100 +1,248 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Image } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, ChevronRight } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
+import { router } from 'expo-router';
+import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/context/auth';
+import { useAuthStore } from '@/store/useAuthStore';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
-// Mock data for conversations
-const conversationsData = [
-  {
-    id: '1',
-    ownerName: 'Sarah Johnson',
-    dogName: 'Max',
-    lastMessage: 'Thanks for taking care of Max today!',
-    time: '10:30 AM',
-    unread: true,
-    image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=200&auto=format&fit=crop',
-  },
-  {
-    id: '2',
-    ownerName: 'Michael Chen',
-    dogName: 'Bella',
-    lastMessage: 'Can you do an extra 30 minutes tomorrow?',
-    time: 'Yesterday',
-    unread: true,
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop',
-  },
-  {
-    id: '3',
-    ownerName: 'Emily Wilson',
-    dogName: 'Charlie',
-    lastMessage: 'Charlie loved the walk! See you next week.',
-    time: 'Yesterday',
-    unread: false,
-    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop',
-  },
-  {
-    id: '4',
-    ownerName: 'David Brown',
-    dogName: 'Luna',
-    lastMessage: 'Luna is excited for her stay this weekend!',
-    time: 'Monday',
-    unread: false,
-    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&auto=format&fit=crop',
-  },
-  {
-    id: '5',
-    ownerName: 'Jennifer Lee',
-    dogName: 'Cooper',
-    lastMessage: 'Cooper has been doing well with his training.',
-    time: 'Last week',
-    unread: false,
-    image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop',
-  },
-];
+type MessageThread = {
+  id: string;
+  booking_id: string;
+  owner_id: string;
+  sitter_id: string;
+  last_message: string;
+  last_message_time: string;
+  created_at: string;
+  updated_at: string;
+  walking_bookings?: {
+    selected_pets: string;
+  };
+};
+
+type Profile = {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+};
+
+type OwnerProfiles = {
+  [key: string]: Profile;
+};
 
 export default function MessagesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredConversations, setFilteredConversations] = useState(conversationsData);
+  const [messageThreads, setMessageThreads] = useState<MessageThread[]>([]);
+  const [filteredThreads, setFilteredThreads] = useState<MessageThread[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [ownerProfiles, setOwnerProfiles] = useState<OwnerProfiles>({});
+  
+  // Access auth state directly from store for more reliable access
+  const user = useAuthStore(state => state.user);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+
+  // Format date to relative time (e.g., '5 minutes ago', 'yesterday')
+  const formatMessageTime = (timestamp: string): string => {
+    if (!timestamp) return '';
+    return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+  };
+
+  useEffect(() => {
+    // If not authenticated, stop loading and return early
+    if (!isAuthenticated) {
+      console.log('Not authenticated, stopping loading');
+      setLoading(false);
+      return;
+    }
+    
+    // If authenticated but no user data yet, wait for it
+    if (!user) {
+      console.log('Authenticated but no user data yet, continuing to wait');
+      return; // Keep loading state true
+    }
+
+    console.log('Fetching message threads for user:', user.id);
+
+    // Fetch message threads for the current sitter
+    const fetchMessageThreads = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('message_threads')
+          .select('*, walking_bookings(selected_pets)')
+          .eq('sitter_id', user.id)
+          .order('last_message_time', { ascending: false });
+
+        if (error) throw error;
+
+        // Handle case when data is null
+        if (!data || data.length === 0) {
+          console.log('No message threads found');
+          setMessageThreads([]);
+          setFilteredThreads([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch owner information
+        const ownerIds = [...new Set(data.map(thread => thread.owner_id))];
+        
+        if (ownerIds.length === 0) {
+          console.log('No owner IDs found in threads');
+          setMessageThreads(data);
+          setFilteredThreads(data);
+          setLoading(false);
+          return;
+        }
+
+        const { data: owners, error: ownersError } = await supabase
+          .from('profiles')
+          .select('id, name, avatar_url')
+          .in('id', ownerIds);
+
+        if (ownersError) throw ownersError;
+
+        // Create a map of owner IDs to owner data
+        const ownersMap: OwnerProfiles = {};
+        if (owners) {
+          owners.forEach(owner => {
+            ownersMap[owner.id] = owner;
+          });
+        }
+
+        setOwnerProfiles(ownersMap);
+        setMessageThreads(data);
+        setFilteredThreads(data);
+      } catch (error) {
+        console.error('Error fetching message threads:', error instanceof Error ? error.message : 'Unknown error');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMessageThreads();
+
+    // Subscribe to real-time updates for message threads
+    const subscription = supabase
+      .channel('message_threads_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'message_threads',
+          filter: `sitter_id=eq.${user.id}`
+        }, 
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          handleRealtimeUpdate(payload);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [user, isAuthenticated]);
+
+  const handleRealtimeUpdate = (payload: RealtimePostgresChangesPayload<MessageThread>) => {
+    // Handle different types of changes
+    try {
+      if (payload.eventType === 'INSERT') {
+        // New thread created
+        setMessageThreads(prev => [payload.new, ...prev]);
+        setFilteredThreads(prev => [payload.new, ...prev]);
+      } else if (payload.eventType === 'UPDATE') {
+        // Thread updated (e.g. new message)
+        setMessageThreads(prev => {
+          const updated = [...prev];
+          const index = updated.findIndex(thread => thread.id === payload.new.id);
+          if (index !== -1) {
+            updated[index] = payload.new;
+            // Sort by last message time
+            updated.sort((a, b) => {
+              return new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime();
+            });
+          }
+          return updated;
+        });
+        setFilteredThreads(prev => {
+          const updated = [...prev];
+          const index = updated.findIndex(thread => thread.id === payload.new.id);
+          if (index !== -1) {
+            updated[index] = payload.new;
+            // Sort by last message time
+            updated.sort((a, b) => {
+              return new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime();
+            });
+          }
+          return updated;
+        });
+      }
+    } catch (error) {
+      console.error('Error handling realtime update:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
 
   const handleSearch = (text) => {
     setSearchQuery(text);
     if (text) {
-      const filtered = conversationsData.filter(
-        conversation => 
-          conversation.ownerName.toLowerCase().includes(text.toLowerCase()) ||
-          conversation.dogName.toLowerCase().includes(text.toLowerCase())
-      );
-      setFilteredConversations(filtered);
+      const filtered = messageThreads.filter(thread => {
+        const ownerName = ownerProfiles[thread.owner_id]?.name || '';
+        return ownerName.toLowerCase().includes(text.toLowerCase()) ||
+               thread.last_message?.toLowerCase().includes(text.toLowerCase());
+      });
+      setFilteredThreads(filtered);
     } else {
-      setFilteredConversations(conversationsData);
+      setFilteredThreads(messageThreads);
     }
   };
 
-  const renderConversationItem = ({ item }) => (
-    <TouchableOpacity style={styles.conversationItem}>
-      <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.image }} style={styles.avatar} />
-        {item.unread && <View style={styles.unreadBadge} />}
-      </View>
-      
-      <View style={styles.conversationInfo}>
-        <View style={styles.conversationHeader}>
-          <Text style={styles.ownerName}>{item.ownerName}</Text>
-          <Text style={styles.timeText}>{item.time}</Text>
+  const navigateToConversation = (thread: MessageThread) => {
+    router.push({
+      pathname: '/conversation/[id]',
+      params: { id: thread.id }
+    });
+  };
+
+  const renderConversationItem = ({ item }: { item: MessageThread }) => {
+    const owner = ownerProfiles[item.owner_id] || {} as Profile;
+    const avatarUrl = owner.avatar_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y';
+    
+    // Check if there are unread messages (this would need to be implemented)
+    const hasUnreadMessages = false; // Placeholder - would need to be calculated based on message read status
+
+    return (
+      <TouchableOpacity 
+        style={styles.conversationItem}
+        onPress={() => navigateToConversation(item)}
+      >
+        <View style={styles.avatarContainer}>
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          {hasUnreadMessages && <View style={styles.unreadBadge} />}
         </View>
         
-        <Text style={styles.dogName}>Owner of {item.dogName}</Text>
-        <Text 
-          style={[styles.lastMessage, item.unread && styles.unreadMessage]}
-          numberOfLines={1}
-        >
-          {item.lastMessage}
-        </Text>
-      </View>
-      
-      <ChevronRight size={20} color="#8E8E93" />
-    </TouchableOpacity>
-  );
+        <View style={styles.conversationInfo}>
+          <View style={styles.conversationHeader}>
+            <Text style={styles.ownerName}>{owner.name || 'Unknown'}</Text>
+            <Text style={styles.timeText}>{formatMessageTime(item.last_message_time)}</Text>
+          </View>
+          
+          <Text style={styles.dogName}>Booking ID: {item.booking_id?.substring(0, 8) || 'N/A'}</Text>
+          <Text 
+            style={[styles.lastMessage, hasUnreadMessages && styles.unreadMessage]}
+            numberOfLines={1}
+          >
+            {item.last_message || 'No messages yet'}
+          </Text>
+        </View>
+        
+        <ChevronRight size={20} color="#8E8E93" />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -112,22 +260,34 @@ export default function MessagesScreen() {
         />
       </View>
       
-      <FlatList
-        data={filteredConversations}
-        renderItem={renderConversationItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.conversationsList}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              {searchQuery 
-                ? 'No conversations found' 
-                : 'No messages yet'}
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#62C6B9" />
+        </View>
+      ) : !isAuthenticated ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>
+            Please sign in to view your messages
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredThreads}
+          renderItem={renderConversationItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.conversationsList}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                {searchQuery 
+                  ? 'No conversations found' 
+                  : 'No messages yet'}
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -198,6 +358,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#62C6B9',
     borderWidth: 2,
     borderColor: '#FFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   conversationInfo: {
     flex: 1,
