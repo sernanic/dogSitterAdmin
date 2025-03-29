@@ -490,3 +490,154 @@ export const clearSitterUnavailableDates = async (sitterId: string): Promise<voi
     throw error;
   }
 }; 
+
+// Portfolio image interface
+export interface PortfolioImage {
+  id: string;
+  sitter_id: string;
+  image_url: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Helper functions for portfolio image management
+export const getPortfolioImages = async (sitterId: string): Promise<PortfolioImage[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('portfolio_images')
+      .select('*')
+      .eq('sitter_id', sitterId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data as PortfolioImage[];
+  } catch (error) {
+    console.error('Error fetching portfolio images:', error);
+    throw error;
+  }
+};
+
+// Helper function to upload portfolio image to storage
+export const uploadPortfolioImage = async (sitterId: string, uri: string, description?: string): Promise<PortfolioImage> => {
+  try {
+    console.log('Starting portfolio image upload process for URI:', uri);
+
+    // Step 1: Compress the image (optional but recommended)
+    console.log('Compressing image...');
+    const compressedImage = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1200 } }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    
+    console.log(`Compressed image URI: ${compressedImage.uri}`);
+    
+    // Step 2: Create a unique file path
+    const fileName = `${sitterId}-${Date.now()}.jpg`;
+    const filePath = `${fileName}`;
+    
+    // Step 3: Read the file as base64 data
+    const fileBase64 = await FileSystem.readAsStringAsync(compressedImage.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    
+    // Step 4: Convert the base64 string to an ArrayBuffer
+    const fileArrayBuffer = decode.decode(fileBase64);
+    
+    // Step 5: Upload to Supabase Storage
+    console.log('Uploading to Supabase storage...');
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('portfolio')
+        .upload(filePath, fileArrayBuffer, {
+          contentType: 'image/jpeg',
+          cacheControl: '3600',
+          upsert: true,
+        });
+      
+      if (error) {
+        console.error('Supabase storage upload error:', error);
+        throw error;
+      }
+      
+      if (!data || !data.path) {
+        throw new Error('Upload succeeded but path is missing');
+      }
+      
+      // Step 6: Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('portfolio')
+        .getPublicUrl(data.path);
+      
+      if (!urlData || !urlData.publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
+      
+      // Step 7: Save image metadata to portfolio_images table
+      const { data: imageData, error: imageError } = await supabase
+        .from('portfolio_images')
+        .insert({
+          sitter_id: sitterId,
+          image_url: urlData.publicUrl,
+          description: description || ''
+        })
+        .select()
+        .single();
+        
+      if (imageError) {
+        console.error('Error saving portfolio image metadata:', imageError);
+        throw imageError;
+      }
+      
+      return imageData as PortfolioImage;
+    } catch (uploadError) {
+      console.error('Caught error during upload step:', uploadError);
+      throw uploadError;
+    }
+  } catch (error) {
+    console.error('Error uploading portfolio image:', error);
+    throw error;
+  }
+};
+
+// Helper function to delete a portfolio image
+export const deletePortfolioImage = async (imageId: string, imageUrl: string): Promise<void> => {
+  try {
+    // First get the image data to verify ownership
+    const { data: imageData, error: fetchError } = await supabase
+      .from('portfolio_images')
+      .select('*')
+      .eq('id', imageId)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    // Extract filename from URL
+    const urlParts = imageUrl.split('/');
+    const fileName = urlParts[urlParts.length - 1];
+    
+    // Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from('portfolio')
+      .remove([fileName]);
+      
+    if (storageError) {
+      console.error('Error removing file from storage:', storageError);
+      // Continue to delete the database record even if storage deletion fails
+    }
+    
+    // Delete the database record
+    const { error: dbError } = await supabase
+      .from('portfolio_images')
+      .delete()
+      .eq('id', imageId);
+      
+    if (dbError) throw dbError;
+    
+  } catch (error) {
+    console.error('Error deleting portfolio image:', error);
+    throw error;
+  }
+};

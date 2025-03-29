@@ -12,6 +12,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Collapsible from 'react-native-collapsible';
+import { Calendar } from 'react-native-calendars';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAvailabilityStore } from '../../store/useAvailabilityStore';
 import { 
@@ -20,13 +21,27 @@ import {
   formatTimeToAMPM, 
   checkTimeSlotOverlap,
   validateTimeSlot,
-  sortTimeSlots
+  sortTimeSlots,
+  isDateInArray,
+  addDateToArray,
+  removeDateFromArray,
+  checkDayHasUnavailability
 } from '../../lib/availability';
+import { format, addMonths } from 'date-fns';
 
 interface DayAvailability {
   day: string;
   isCollapsed: boolean;
   timeSlots: TimeSlot[];
+}
+
+type AvailabilityMode = 'walking' | 'boarding';
+
+interface AvailabilityManagerProps {
+  onAvailabilityUpdated: () => void;
+  mode?: AvailabilityMode;
+  boardingDates?: Date[];
+  onBoardingDatesChanged?: (dates: Date[]) => void;
 }
 
 const DAYS_OF_WEEK = [
@@ -45,7 +60,12 @@ const PREDEFINED_SLOTS = [
   { label: 'Evening', value: { start: '16:00', end: '19:00' } }
 ];
 
-const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated: () => void }) => {
+const AvailabilityManager = ({ 
+  onAvailabilityUpdated,
+  mode = 'walking',
+  boardingDates = [],
+  onBoardingDatesChanged = () => {}
+}: AvailabilityManagerProps) => {
   const user = useAuthStore(state => state.user);
   const { 
     availability, 
@@ -63,6 +83,10 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
     day: '',
     slotId: null
   });
+  
+  // Boarding availability state
+  const [selectedBoardingDates, setSelectedBoardingDates] = useState<Date[]>(boardingDates || []);
+  const [calendarMarkedDates, setCalendarMarkedDates] = useState<Record<string, any>>({});
   
   const [dayAvailability, setDayAvailability] = useState<DayAvailability[]>(
     DAYS_OF_WEEK.map(day => ({
@@ -106,6 +130,64 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
       setDayAvailability(updatedDayAvailability);
     }
   }, [availability, expandedDay]);
+  
+  // Update boardingDates state when passed from props
+  useEffect(() => {
+    if (boardingDates && mode === 'boarding') {
+      setSelectedBoardingDates(boardingDates);
+      updateCalendarMarks(boardingDates);
+    }
+  }, [boardingDates, mode]);
+  
+  // Update calendar marked dates whenever selected dates change
+  const updateCalendarMarks = (dates: Date[]) => {
+    const markedDates: Record<string, any> = {};
+    
+    // Add all selected dates
+    dates.forEach(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      markedDates[dateStr] = {
+        selected: true,
+        selectedColor: '#007AFF',
+      };
+    });
+    
+    setCalendarMarkedDates(markedDates);
+  };
+  
+  // Handle boarding date selection
+  const handleDateSelect = async (date: any) => {
+    try {
+      const selectedDate = new Date(date.dateString);
+      
+      // Check if date is already in unavailability table
+      if (user?.id) {
+        const hasUnavailability = await checkDayHasUnavailability(user.id, selectedDate);
+        
+        if (hasUnavailability) {
+          Alert.alert(
+            'Date Unavailable', 
+            'This date is marked as unavailable in your calendar. Please select a different date.'
+          );
+          return;
+        }
+      }
+      
+      // Toggle the selection
+      let newDates;
+      if (isDateInArray(selectedDate, selectedBoardingDates)) {
+        newDates = removeDateFromArray(selectedDate, selectedBoardingDates);
+      } else {
+        newDates = addDateToArray(selectedDate, selectedBoardingDates);
+      }
+      
+      setSelectedBoardingDates(newDates);
+      updateCalendarMarks(newDates);
+    } catch (error) {
+      console.error('Error selecting date:', error);
+      Alert.alert('Error', 'Failed to select date. Please try again.');
+    }
+  };
 
   const toggleDay = (day: string) => {
     setExpandedDay(expandedDay === day ? null : day);
@@ -285,41 +367,54 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
   const handleSaveAvailability = async () => {
     if (!user?.id) return;
     
-    // Convert to format expected by backend
-    const formattedAvailability = DAYS_OF_WEEK.reduce((acc, day) => {
-      const dayData = dayAvailability.find(d => d.day === day);
-      // Sort time slots before saving
-      const slots = dayData?.timeSlots || [];
-      acc[day.toLowerCase()] = sortTimeSlots(slots);
-      return acc;
-    }, {} as Record<string, TimeSlot[]>);
-
     try {
-      // The saveAvailability function in the store will handle setting isLoading
-      const result = await saveAvailability(user.id, formattedAvailability);
-      
-      if (result.success) {
+      // Different save logic depending on mode
+      if (mode === 'walking') {
+        // Convert to format expected by backend
+        const formattedAvailability = DAYS_OF_WEEK.reduce((acc, day) => {
+          const dayData = dayAvailability.find(d => d.day === day);
+          // Sort time slots before saving
+          const slots = dayData?.timeSlots || [];
+          acc[day.toLowerCase()] = sortTimeSlots(slots);
+          return acc;
+        }, {} as Record<string, TimeSlot[]>);
+
+        // The saveAvailability function in the store will handle setting isLoading
+        const result = await saveAvailability(user.id, formattedAvailability);
+        
+        if (result.success) {
+          Alert.alert(
+            "Success",
+            "Your walking availability has been updated successfully!",
+            [{ text: "OK" }]
+          );
+          onAvailabilityUpdated();
+        } else {
+          // Check if the error is about overlapping slots
+          if (result.error && result.error.includes('overlaps')) {
+            Alert.alert(
+              "Time Slot Overlap Error",
+              "Please check your time slots for overlaps. Make sure no time slots overlap with each other.",
+              [{ text: "OK" }]
+            );
+          } else {
+            Alert.alert(
+              "Error",
+              result.error || "Failed to save your availability. Please try again.",
+              [{ text: "OK" }]
+            );
+          }
+        }
+      } else {
+        // Boarding mode - use the onBoardingDatesChanged callback
+        console.log('Saving boarding dates:', selectedBoardingDates);
+        onBoardingDatesChanged(selectedBoardingDates);
         Alert.alert(
           "Success",
-          "Your availability has been updated successfully!",
+          "Your boarding availability has been updated successfully!",
           [{ text: "OK" }]
         );
         onAvailabilityUpdated();
-      } else {
-        // Check if the error is about overlapping slots
-        if (result.error && result.error.includes('overlaps')) {
-          Alert.alert(
-            "Time Slot Overlap Error",
-            "Please check your time slots for overlaps. Make sure no time slots overlap with each other.",
-            [{ text: "OK" }]
-          );
-        } else {
-          Alert.alert(
-            "Error",
-            result.error || "Failed to save your availability. Please try again.",
-            [{ text: "OK" }]
-          );
-        }
       }
     } catch (error) {
       console.error("Error saving availability:", error);
@@ -516,45 +611,113 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
     </View>
   );
   
+  // Render the calendar view for boarding availability
+  const renderBoardingCalendar = () => {
+    const today = new Date();
+    const maxDate = addMonths(today, 3); // Allow bookings 3 months in advance
+    
+    return (
+      <View style={styles.calendarContainer}>
+        <Text style={styles.calendarTitle}>Select Days Available for Boarding</Text>
+        <Text style={styles.calendarSubtitle}>Tap on dates to mark them as available for boarding</Text>
+        
+        <Calendar
+          minDate={today.toISOString().split('T')[0]}
+          maxDate={maxDate.toISOString().split('T')[0]}
+          onDayPress={handleDateSelect}
+          markedDates={calendarMarkedDates}
+          theme={{
+            selectedDayBackgroundColor: '#007AFF',
+            selectedDayTextColor: '#ffffff',
+            todayTextColor: '#007AFF',
+            textDayFontWeight: '400',
+            textMonthFontWeight: 'bold',
+            textDayHeaderFontWeight: '400',
+            textDayFontSize: 16,
+            textMonthFontSize: 16,
+            textDayHeaderFontSize: 14
+          }}
+          // Fix for the nested VirtualizedLists warning
+          disableScrollToMonth={true}
+        />
+        
+        <View style={styles.calendarLegend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#007AFF' }]} />
+            <Text style={styles.legendText}>Available for Boarding</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#f0f0f0' }]} />
+            <Text style={styles.legendText}>Not Available</Text>
+          </View>
+        </View>
+        
+        <View style={styles.selectedDatesContainer}>
+          <Text style={styles.selectedDatesTitle}>
+            {selectedBoardingDates.length} Day{selectedBoardingDates.length !== 1 ? 's' : ''} Selected
+          </Text>
+        </View>
+      </View>
+    );
+  };
+  
   return (
     <View style={styles.container}>
-      <FlatList
-        data={dayAvailability}
-        renderItem={renderDayItem}
-        keyExtractor={item => item.day}
-        contentContainerStyle={styles.listContent}
-      />
-      
-      <TouchableOpacity 
-        style={styles.saveButton}
-        onPress={handleSaveAvailability}
-        disabled={isLoading}
-      >
-        <Text style={styles.saveButtonText}>
-          {isLoading ? 'Saving...' : 'Save Availability'}
-        </Text>
-      </TouchableOpacity>
-      
-      {/* Platform specific time picker rendering */}
-      {Platform.OS === 'ios' && showTimePicker && (
-        <DateTimePicker
-          value={selectedTime}
-          mode="time"
-          is24Hour={false}
-          display="spinner"
-          onChange={handleTimeChange}
-        />
-      )}
+      {mode === 'walking' ? (
+        <>
+          <FlatList
+            data={dayAvailability}
+            renderItem={renderDayItem}
+            keyExtractor={item => item.day}
+            contentContainerStyle={styles.listContent}
+          />
+          
+          <TouchableOpacity 
+            style={styles.saveButton}
+            onPress={handleSaveAvailability}
+            disabled={isLoading}
+          >
+            <Text style={styles.saveButtonText}>
+              {isLoading ? 'Saving...' : 'Save Walking Availability'}
+            </Text>
+          </TouchableOpacity>
+          
+          {/* Platform specific time picker rendering */}
+          {Platform.OS === 'ios' && showTimePicker && (
+            <DateTimePicker
+              value={selectedTime}
+              mode="time"
+              is24Hour={false}
+              display="spinner"
+              onChange={handleTimeChange}
+            />
+          )}
 
-      {/* Android time picker - only show when needed */}
-      {Platform.OS === 'android' && androidTimePickerVisible && (
-        <DateTimePicker
-          value={selectedTime}
-          mode="time"
-          is24Hour={false}
-          display="default"
-          onChange={handleTimeChange}
-        />
+          {/* Android time picker - only show when needed */}
+          {Platform.OS === 'android' && androidTimePickerVisible && (
+            <DateTimePicker
+              value={selectedTime}
+              mode="time"
+              is24Hour={false}
+              display="default"
+              onChange={handleTimeChange}
+            />
+          )}
+        </>
+      ) : (
+        <>
+          {renderBoardingCalendar()}
+          
+          <TouchableOpacity 
+            style={styles.saveButton}
+            onPress={handleSaveAvailability}
+            disabled={isLoading}
+          >
+            <Text style={styles.saveButtonText}>
+              {isLoading ? 'Saving...' : 'Save Boarding Availability'}
+            </Text>
+          </TouchableOpacity>
+        </>
       )}
     </View>
   );
@@ -563,6 +726,60 @@ const AvailabilityManager = ({ onAvailabilityUpdated }: { onAvailabilityUpdated:
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  calendarContainer: {
+    padding: 16,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    margin: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  calendarTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  calendarSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  calendarLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 16,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  legendText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  selectedDatesContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  selectedDatesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   listContent: {
     paddingBottom: 80,

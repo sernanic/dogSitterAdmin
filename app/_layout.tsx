@@ -6,6 +6,8 @@ import { useFonts } from 'expo-font';
 import { SplashScreen } from 'expo-router';
 import AuthProvider from '../components/providers/AuthProvider';
 import * as Font from 'expo-font';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StyleSheet } from 'react-native';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -52,31 +54,39 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen 
-          name="(tabs)" 
-          options={{ 
-            headerShown: false,
-            animation: 'fade',
-          }} 
-        />
-        <Stack.Screen 
-          name="auth" 
-          options={{ 
-            headerShown: false,
-            animation: 'fade',
-          }} 
-        />
-        <Stack.Screen 
-          name="+not-found" 
-          options={{ 
-            title: 'Oops!',
-            animation: 'fade',
-          }} 
-        />
-      </Stack>
-      <StatusBar style="auto" />
-    </AuthProvider>
+    <GestureHandlerRootView style={styles.container}>
+      <AuthProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen 
+            name="(tabs)" 
+            options={{ 
+              headerShown: false,
+              animation: 'fade',
+            }} 
+          />
+          <Stack.Screen 
+            name="auth" 
+            options={{ 
+              headerShown: false,
+              animation: 'fade',
+            }} 
+          />
+          <Stack.Screen 
+            name="+not-found" 
+            options={{ 
+              title: 'Oops!',
+              animation: 'fade',
+            }} 
+          />
+        </Stack>
+        <StatusBar style="auto" />
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});

@@ -2,14 +2,23 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import EventRegister from '../../utils/EventRegister';
+import { useAuthStore } from '../../store/useAuthStore';
 
 interface AccountSettingsProps {
   onAddressPress: () => void;
   onAvailabilityPress: () => void;
   onUnavailabilityPress: () => void;
+  onPaymentSetupPress?: () => void;
 }
 
-const AccountSettings = ({ onAddressPress, onAvailabilityPress, onUnavailabilityPress }: AccountSettingsProps) => {
+const AccountSettings = ({ 
+  onAddressPress, 
+  onAvailabilityPress, 
+  onUnavailabilityPress,
+  onPaymentSetupPress 
+}: AccountSettingsProps) => {
+  // Get user to check if they're a sitter
+  const user = useAuthStore(state => state.user);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Account Settings</Text>
@@ -61,6 +70,18 @@ const AccountSettings = ({ onAddressPress, onAvailabilityPress, onUnavailability
         <Text style={styles.settingText}>Privacy & Security</Text>
         <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
       </TouchableOpacity>
+
+      {/* Payment Setup Option (Only for Sitters) */}
+      {user?.role === 'sitter' && onPaymentSetupPress && (
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={onPaymentSetupPress}
+        >
+          <MaterialCommunityIcons name="credit-card-outline" size={24} color="#666" />
+          <Text style={styles.settingText}>Payment Setup</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

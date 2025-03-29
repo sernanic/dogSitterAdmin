@@ -119,12 +119,26 @@ export default function BookingsScreen() {
         const petIds: string[] = [];
         bookingsData.forEach(booking => {
           try {
-            const selectedPets = JSON.parse(booking.selected_pets);
-            if (Array.isArray(selectedPets)) {
-              petIds.push(...selectedPets);
+            // Check if it's already a valid array (might be pre-parsed by Supabase)
+            if (typeof booking.selected_pets === 'object' && Array.isArray(booking.selected_pets)) {
+              const petArray = booking.selected_pets as string[];
+              petIds.push(...petArray);
+            } 
+            // Try to parse it as JSON
+            else if (typeof booking.selected_pets === 'string') {
+              // Make sure it at least looks like a JSON array before parsing
+              if (booking.selected_pets.trim().startsWith('[') && booking.selected_pets.trim().endsWith(']')) {
+                const selectedPets = JSON.parse(booking.selected_pets) as string[];
+                if (Array.isArray(selectedPets)) {
+                  petIds.push(...selectedPets);
+                }
+              } else {
+                console.log('Not a JSON array format:', booking.selected_pets);
+              }
             }
           } catch (e) {
-            console.error('Error parsing pets:', e);
+            console.error('Error parsing pets from booking ID ' + booking.id + ':', e);
+            console.log('Raw selected_pets value:', booking.selected_pets);
           }
         });
         
@@ -174,14 +188,34 @@ export default function BookingsScreen() {
   // Format booking pets list as a string
   const formatPetsList = (booking: Booking): string => {
     try {
-      const petIds = JSON.parse(booking.selected_pets);
-      if (Array.isArray(petIds) && petIds.length > 0) {
-        return petIds
-          .map(id => pets[id]?.name || 'Unknown')
-          .join(', ');
+      // Check if it's already a valid array (might be pre-parsed by Supabase)
+      if (typeof booking.selected_pets === 'object' && Array.isArray(booking.selected_pets)) {
+        const petArray = booking.selected_pets as string[];
+        if (petArray.length > 0) {
+          return petArray
+            .map((id: string) => pets[id]?.name || 'Unknown')
+            .join(', ');
+        }
+        return 'No pets';
+      }
+      
+      // Try to parse it as JSON string
+      if (typeof booking.selected_pets === 'string') {
+        // Make sure it at least looks like a JSON array before parsing
+        if (booking.selected_pets.trim().startsWith('[') && booking.selected_pets.trim().endsWith(']')) {
+          const petIds = JSON.parse(booking.selected_pets) as string[];
+          if (Array.isArray(petIds) && petIds.length > 0) {
+            return petIds
+              .map((id: string) => pets[id]?.name || 'Unknown')
+              .join(', ');
+          }
+        } else {
+          console.log('Not a JSON array format in formatPetsList:', booking.selected_pets);
+          return 'Pet info unavailable';
+        }
       }
     } catch (e) {
-      console.error('Error parsing pet IDs:', e);
+      console.error('Error parsing pet IDs in formatPetsList:', e);
     }
     return 'No pets';
   };

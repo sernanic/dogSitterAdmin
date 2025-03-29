@@ -9,19 +9,28 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert
+  Alert,
+  ScrollView
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AvailabilityManager from './AvailabilityManager';
 import { useAvailabilityStore } from '../../store/useAvailabilityStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { debugAvailabilityTables, getDirectSitterAvailability } from '../../lib/availability';
+import { 
+  debugAvailabilityTables, 
+  getDirectSitterAvailability, 
+  fetchUserBoardingAvailability,
+  boardingDatesToDateArray,
+  saveUserBoardingAvailability
+} from '../../lib/availability';
 
 interface AvailabilityManagerModalProps {
   isVisible: boolean;
   onClose: () => void;
   onAvailabilityUpdated: () => void;
 }
+
+type AvailabilityTab = 'walking' | 'boarding';
 
 const AvailabilityManagerModal = ({
   isVisible,
@@ -36,6 +45,12 @@ const AvailabilityManagerModal = ({
   const [forceShowEmpty, setForceShowEmpty] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasLoadedRef = useRef(false);
+
+  // New state for tab selection and boarding availability
+  const [activeTab, setActiveTab] = useState<AvailabilityTab>('walking');
+  const [boardingDates, setBoardingDates] = useState<Date[]>([]);
+  const [loadingBoardingDates, setLoadingBoardingDates] = useState(false);
+  const [boardingError, setBoardingError] = useState<string | null>(null);
 
   // FIRST useEffect: Only handle modal visibility changes
   useEffect(() => {
@@ -83,6 +98,7 @@ const AvailabilityManagerModal = ({
       
       // Load the data
       fetchAvailability(user.id);
+      loadBoardingAvailability(user.id);
     }
     
     // Cleanup on unmount
@@ -92,6 +108,48 @@ const AvailabilityManagerModal = ({
       }
     };
   }, [isVisible, user?.id, loadAttempts]);
+  
+  // Load boarding availability data
+  const loadBoardingAvailability = async (userId: string) => {
+    try {
+      setLoadingBoardingDates(true);
+      setBoardingError(null);
+      
+      const boardingDatesData = await fetchUserBoardingAvailability(userId);
+      const dateArray = boardingDatesToDateArray(boardingDatesData);
+      
+      console.log(`Loaded ${dateArray.length} boarding dates`);
+      setBoardingDates(dateArray);
+    } catch (error: any) {
+      console.error('Error loading boarding availability:', error);
+      setBoardingError(error.message || 'Failed to load boarding availability');
+    } finally {
+      setLoadingBoardingDates(false);
+    }
+  };
+  
+  // Save boarding availability
+  const saveBoardingAvailability = async (dates: Date[]) => {
+    if (!user?.id) return;
+    
+    try {
+      setLocalLoading(true);
+      const result = await saveUserBoardingAvailability(user.id, dates);
+      
+      if (result.success) {
+        Alert.alert('Success', 'Your boarding availability has been updated!');
+        // Call the parent's callback to refresh data
+        onAvailabilityUpdated();
+      } else {
+        Alert.alert('Error', result.error || 'Failed to save boarding availability');
+      }
+    } catch (error: any) {
+      console.error('Error saving boarding availability:', error);
+      Alert.alert('Error', error.message || 'An error occurred while saving');
+    } finally {
+      setLocalLoading(false);
+    }
+  };
   
   const handleClose = () => {
     // Clean up and close
@@ -200,12 +258,62 @@ const AvailabilityManagerModal = ({
         <MaterialIcons name="event-available" size={64} color="#007AFF" />
         <Text style={styles.emptyTitle}>No Availability Set</Text>
         <Text style={styles.emptyDescription}>
-          You haven't set up your availability yet. Use the tools below to add your available time slots.
+          {activeTab === 'walking' ? 
+            "You haven't set up your walking availability yet. Use the tools below to add your available time slots." :
+            "You haven't set up your boarding availability yet. Use the calendar below to select days you're available for boarding."
+          }
         </Text>
-        <AvailabilityManager onAvailabilityUpdated={handleAvailabilityUpdated} />
+        {activeTab === 'walking' ? (
+          <AvailabilityManager 
+            onAvailabilityUpdated={handleAvailabilityUpdated} 
+            mode="walking"
+          />
+        ) : (
+          <AvailabilityManager 
+            onAvailabilityUpdated={handleAvailabilityUpdated}
+            mode="boarding"
+            boardingDates={boardingDates}
+            onBoardingDatesChanged={saveBoardingAvailability}
+          />
+        )}
       </View>
     );
   };
+  
+  // Render tab selector
+  const renderTabs = () => {
+    return (
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'walking' && styles.activeTab]}
+          onPress={() => setActiveTab('walking')}
+        >
+          <MaterialIcons 
+            name="directions-walk" 
+            size={24} 
+            color={activeTab === 'walking' ? "#007AFF" : "#777"} 
+          />
+          <Text style={[styles.tabText, activeTab === 'walking' && styles.activeTabText]}>
+            Walking
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'boarding' && styles.activeTab]}
+          onPress={() => setActiveTab('boarding')}
+        >
+          <MaterialIcons 
+            name="home" 
+            size={24} 
+            color={activeTab === 'boarding' ? "#007AFF" : "#777"} 
+          />
+          <Text style={[styles.tabText, activeTab === 'boarding' && styles.activeTabText]}>
+            Boarding
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   
   // Show empty state if forced or if no data and not loading
   const shouldShowEmptyState = forceShowEmpty || 
@@ -233,10 +341,10 @@ const AvailabilityManagerModal = ({
           </View>
           
           <SafeAreaView style={styles.container}>
-            {isLoading && !forceShowEmpty ? (
+            {isLoading && !forceShowEmpty && activeTab === 'walking' ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#007AFF" />
-                <Text style={styles.loadingText}>Loading your availability...</Text>
+                <Text style={styles.loadingText}>Loading your walking availability...</Text>
                 
                 <TouchableOpacity 
                   style={[styles.skipButton, { marginTop: 30 }]}
@@ -245,11 +353,23 @@ const AvailabilityManagerModal = ({
                   <Text style={styles.skipButtonText}>Skip Loading</Text>
                 </TouchableOpacity>
               </View>
-            ) : error && !forceShowEmpty ? (
+            ) : loadingBoardingDates && !forceShowEmpty && activeTab === 'boarding' ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#007AFF" />
+                <Text style={styles.loadingText}>Loading your boarding availability...</Text>
+                
+                <TouchableOpacity 
+                  style={[styles.skipButton, { marginTop: 30 }]}
+                  onPress={handleForceEmpty}
+                >
+                  <Text style={styles.skipButtonText}>Skip Loading</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (error && !forceShowEmpty && activeTab === 'walking') || (boardingError && !forceShowEmpty && activeTab === 'boarding') ? (
               <View style={styles.errorContainer}>
                 <MaterialIcons name="error-outline" size={48} color="#f44336" />
                 <Text style={styles.errorText}>Failed to load availability</Text>
-                <Text style={styles.errorDescription}>{error}</Text>
+                <Text style={styles.errorDescription}>{activeTab === 'walking' ? error : boardingError}</Text>
                 <View style={styles.buttonRow}>
                   <TouchableOpacity 
                     style={styles.retryButton} 
@@ -272,10 +392,28 @@ const AvailabilityManagerModal = ({
                   <Text style={styles.continueText}>Continue Without Loading</Text>
                 </TouchableOpacity>
               </View>
-            ) : shouldShowEmptyState ? (
-              showEmptyView()
             ) : (
-              <AvailabilityManager onAvailabilityUpdated={handleAvailabilityUpdated} />
+              <View style={styles.contentContainer}>
+                {renderTabs()}
+                
+                {shouldShowEmptyState ? (
+                  showEmptyView()
+                ) : (
+                  activeTab === 'walking' ? (
+                    <AvailabilityManager 
+                      onAvailabilityUpdated={handleAvailabilityUpdated} 
+                      mode="walking"
+                    />
+                  ) : (
+                    <AvailabilityManager 
+                      onAvailabilityUpdated={handleAvailabilityUpdated}
+                      mode="boarding"
+                      boardingDates={boardingDates}
+                      onBoardingDatesChanged={saveBoardingAvailability}
+                    />
+                  )
+                )}
+              </View>
             )}
           </SafeAreaView>
           
@@ -299,6 +437,36 @@ const styles = StyleSheet.create({
     height: '90%',
     padding: 20,
     position: 'relative',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    borderRadius: 10,
+    backgroundColor: '#f5f5f5',
+    overflow: 'hidden',
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  activeTab: {
+    backgroundColor: '#e0f0ff',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+    color: '#777',
+  },
+  activeTabText: {
+    color: '#007AFF',
+  },
+  contentContainer: {
+    flex: 1,
   },
   dragIndicator: {
     width: 60,

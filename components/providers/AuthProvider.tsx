@@ -1,7 +1,7 @@
-import React, { ReactNode, useEffect, useState, useCallback } from 'react';
+import React, { ReactNode, useEffect, useState, useCallback, useRef } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { router, usePathname } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, Text } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
 interface AuthProviderProps {
@@ -13,17 +13,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   // Use separate state for initial loading to avoid dependency cycles
   const [isInitializing, setIsInitializing] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   
   // Use the stable refreshSession function from store
   const refreshSession = useAuthStore((state) => state.refreshSession);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   
+  // Add timeout reference
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Initialize auth state once on mount
   const initAuth = useCallback(async () => {
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Set a timeout to prevent infinite loading
+    timeoutRef.current = setTimeout(() => {
+      console.warn('Auth initialization timed out');
+      setInitError('Authentication initialization timed out');
+      setIsInitializing(false);
+    }, 10000); // 10 seconds timeout
+
     try {
       await refreshSession();
+      // Clear the timeout if successful
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     } catch (error) {
       console.error('Error refreshing session:', error);
+      setInitError(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsInitializing(false);
     }
@@ -70,12 +92,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [isInitializing, isAuthenticated, pathname]);
 
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   if (isInitializing) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#0000ff" />
       </View>
     );
+  }
+  
+  // Show error screen if there was an initialization error
+  if (initError) {
+    console.warn('Auth init error:', initError);
+    // Continue to render the app instead of showing error
+    // This allows the redirect to auth screen to happen
   }
 
   return <>{children}</>;

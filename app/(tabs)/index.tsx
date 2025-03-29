@@ -1,31 +1,56 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, DollarSign, Star, Clock, Users } from 'lucide-react-native';
+import { Bell, DollarSign, Star, Clock, Users, MapPin, Calendar } from 'lucide-react-native';
+import { supabase } from '../../lib/supabase';
+import { format, parseISO } from 'date-fns';
+import { router } from 'expo-router';
+import { useAuthStore } from '../../store/useAuthStore';
 
-// Mock data for upcoming bookings
-const upcomingBookings = [
-  {
-    id: '1',
-    ownerName: 'Sarah Johnson',
-    dogName: 'Max',
-    dogBreed: 'Golden Retriever',
-    date: 'Today, 2:00 PM',
-    service: 'Dog Walking',
-    duration: '30 min',
-    image: 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=200&auto=format&fit=crop',
-  },
-  {
-    id: '2',
-    ownerName: 'Michael Chen',
-    dogName: 'Bella',
-    dogBreed: 'Beagle',
-    date: 'Tomorrow, 9:00 AM',
-    service: 'Home Sitting',
-    duration: '3 hours',
-    image: 'https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?q=80&w=200&auto=format&fit=crop',
-  },
-];
+// Interfaces for data types
+interface Pet {
+  id: string;
+  name: string;
+  breed: string;
+  age: number;
+  gender: string;
+  image_url?: string;
+}
+
+interface Profile {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url?: string | null;
+}
+
+interface Address {
+  id: string;
+  formatted_address: string;
+  street_address: string;
+  city: string;
+  state: string;
+  postal_code: string;
+}
+
+interface Booking {
+  id: string;
+  owner_id: string;
+  sitter_id: string;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+  selected_pets: string; // JSON string of pet IDs
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  total_price: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  owner?: Profile;
+  address?: Address;
+  pets?: Pet[];
+}
 
 // Mock data for earnings
 const earningsData = {
@@ -42,13 +67,208 @@ export default function HomeScreen() {
     averageRating: 4.8,
     totalClients: 12,
   });
+  const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
+  const [owners, setOwners] = useState<{[key: string]: Profile}>({});
+  const [pets, setPets] = useState<{[key: string]: Pet}>({});
+  const [loadingBookings, setLoadingBookings] = useState(true);
+  
+  // Get the current authenticated user
+  const { user, isAuthenticated } = useAuthStore();
 
+  // Fetch the upcoming bookings when the component loads
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchUpcomingBookings();
+    } else {
+      setLoadingBookings(false);
+    }
+  }, [isAuthenticated, user]);
+
+  // Function to fetch upcoming bookings
+  const fetchUpcomingBookings = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingBookings(true);
+      
+      // Fetch the next 2 upcoming bookings for the sitter
+      const { data: bookingsData, error } = await supabase
+        .from('walking_bookings')
+        .select('*')
+        .eq('sitter_id', user.id)
+        .in('status', ['pending', 'confirmed'])
+        .order('booking_date', { ascending: true })
+        .limit(2);
+        
+      if (error) throw error;
+      
+      if (bookingsData && bookingsData.length > 0) {
+        // Get unique owner IDs to fetch profiles
+        const ownerIds = [...new Set(bookingsData.map(booking => booking.owner_id))];
+        
+        // Fetch owner profiles
+        const { data: ownerProfiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', ownerIds);
+          
+        if (profilesError) throw profilesError;
+        
+        // Create a map of owner profiles
+        const ownersMap: {[key: string]: Profile} = {};
+        if (ownerProfiles) {
+          ownerProfiles.forEach(profile => {
+            ownersMap[profile.id] = profile;
+          });
+        }
+        setOwners(ownersMap);
+        
+        // Extract all pet IDs from bookings
+        const petIds: string[] = [];
+        bookingsData.forEach(booking => {
+          try {
+            // Check if it's already a valid array (might be pre-parsed by Supabase)
+            if (typeof booking.selected_pets === 'object' && Array.isArray(booking.selected_pets)) {
+              const petArray = booking.selected_pets as string[];
+              petIds.push(...petArray);
+            }
+            // Try to parse it as JSON
+            else if (typeof booking.selected_pets === 'string') {
+              // Make sure it at least looks like a JSON array before parsing
+              if (booking.selected_pets.trim().startsWith('[') && booking.selected_pets.trim().endsWith(']')) {
+                const selectedPets = JSON.parse(booking.selected_pets) as string[];
+                if (Array.isArray(selectedPets)) {
+                  petIds.push(...selectedPets);
+                }
+              } else {
+                console.log('Not a JSON array format:', booking.selected_pets);
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing pets from booking ID ' + booking.id + ':', e);
+            console.log('Raw selected_pets value:', booking.selected_pets);
+          }
+        });
+        
+        if (petIds.length > 0) {
+          // Fetch pet details - make sure we have unique IDs
+          const uniquePetIds = [...new Set(petIds)];
+          console.log('Fetching pets with IDs:', uniquePetIds);
+          
+          // Fetch pet details - attempt to fetch each pet individually to maximize chances of success
+          const petsMap: {[key: string]: Pet} = {};
+          const fetchPetPromises = uniquePetIds.map(async (petId) => {
+            try {
+              const { data, error } = await supabase
+                .from('pets')
+                .select('*')
+                .eq('id', petId)
+                .single();
+                
+              if (error) {
+                console.error(`Error fetching pet ${petId}:`, error);
+              } else if (data) {
+                console.log(`Found pet ${petId}:`, data.name);
+                petsMap[petId] = data;
+              }
+            } catch (fetchErr) {
+              console.error(`Exception fetching pet ${petId}:`, fetchErr);
+            }
+          });
+          
+          // Wait for all pet fetches to complete
+          await Promise.all(fetchPetPromises);
+          
+          // Log the results
+          if (Object.keys(petsMap).length === 0) {
+            console.warn('No pets found for IDs:', uniquePetIds);
+          } else {
+            console.log(`Found ${Object.keys(petsMap).length} pets:`, 
+              Object.values(petsMap).map(p => p.name));
+          }
+          
+          // Set the pets map
+          setPets(petsMap);
+        }
+        
+        // Set the bookings data
+        setUpcomingBookings(bookingsData);
+      } else {
+        // No bookings found
+        setUpcomingBookings([]);
+      }
+    } catch (error) {
+      console.error('Error fetching upcoming bookings:', error);
+    } finally {
+      setLoadingBookings(false);
+    }
+  };
+  
+  // Helper functions for formatting booking data
+  const formatPetsList = (booking: Booking): string => {
+    try {
+      // Check if it's already a valid array (might be pre-parsed by Supabase)
+      if (typeof booking.selected_pets === 'object' && Array.isArray(booking.selected_pets)) {
+        const petArray = booking.selected_pets as string[];
+        if (petArray.length > 0) {
+          const petNames = petArray.map((id: string) => {
+            const petName = pets[id]?.name;
+            if (!petName) {
+              console.log(`Pet ${id} not found in pets map:`, Object.keys(pets));
+              return 'Loading...';
+            }
+            return petName;
+          });
+          return petNames.join(', ');
+        }
+        return 'No pets';
+      }
+      
+      // Try to parse it as JSON string
+      if (typeof booking.selected_pets === 'string') {
+        // Make sure it at least looks like a JSON array before parsing
+        if (booking.selected_pets.trim().startsWith('[') && booking.selected_pets.trim().endsWith(']')) {
+          const petIds = JSON.parse(booking.selected_pets) as string[];
+          if (Array.isArray(petIds) && petIds.length > 0) {
+            const petNames = petIds.map((id: string) => {
+              const petName = pets[id]?.name;
+              if (!petName) {
+                console.log(`Pet ${id} not found in pets map:`, Object.keys(pets));
+                return 'Loading...';
+              }
+              return petName;
+            });
+            return petNames.join(', ');
+          }
+        } else {
+          console.log('Not a JSON array format in formatPetsList:', booking.selected_pets);
+          return 'Pet info unavailable';
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing pet IDs in formatPetsList:', e);
+    }
+    return 'No pets';
+  };
+  
+  const formatBookingDate = (dateString: string): string => {
+    try {
+      return format(parseISO(dateString), 'MMM dd, yyyy');
+    } catch (e) {
+      return dateString;
+    }
+  };
+  
+  const formatTimeRange = (booking: Booking): string => {
+    return `${booking.start_time.substring(0, 5)} - ${booking.end_time.substring(0, 5)}`;
+  };
+  
+  // Refresh function for pull-to-refresh
   const onRefresh = () => {
     setRefreshing(true);
-    // Simulate a data refresh
-    setTimeout(() => {
+    fetchUpcomingBookings().then(() => {
       setRefreshing(false);
-    }, 1000);
+    });
   };
 
   return (
@@ -127,30 +347,62 @@ export default function HomeScreen() {
         <View style={styles.upcomingSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/bookings')}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
 
-          {upcomingBookings.map((booking) => (
-            <TouchableOpacity key={booking.id} style={styles.bookingCard}>
-              <Image source={{ uri: booking.image }} style={styles.dogImage} />
-              <View style={styles.bookingInfo}>
-                <Text style={styles.dogName}>{booking.dogName}</Text>
-                <Text style={styles.dogBreed}>{booking.dogBreed}</Text>
-                <View style={styles.bookingDetails}>
-                  <View style={styles.bookingDetailItem}>
-                    <Clock size={14} color="#666" />
-                    <Text style={styles.bookingDetailText}>{booking.date}</Text>
-                  </View>
-                  <View style={styles.bookingDetailItem}>
-                    <DollarSign size={14} color="#666" />
-                    <Text style={styles.bookingDetailText}>{booking.service}</Text>
+          {loadingBookings ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#62C6B9" />
+            </View>
+          ) : upcomingBookings.length === 0 ? (
+            <View style={styles.noBookingsContainer}>
+              <Text style={styles.noBookingsText}>No upcoming bookings</Text>
+            </View>
+          ) : (
+            upcomingBookings.map((booking) => (
+              <TouchableOpacity 
+                key={booking.id} 
+                style={styles.bookingCard}
+                onPress={() => router.push(`/booking/${booking.id}`)}
+              >
+                {/* Show pet image if available, otherwise use placeholder */}
+                <Image 
+                  source={{ 
+                    uri: (() => {
+                      try {
+                        const petIds = JSON.parse(booking.selected_pets);
+                        if (Array.isArray(petIds) && petIds.length > 0) {
+                          return pets[petIds[0]]?.image_url || 'https://placehold.co/100x100/png';
+                        }
+                        return 'https://placehold.co/100x100/png';
+                      } catch {
+                        return 'https://placehold.co/100x100/png';
+                      }
+                    })()
+                  }} 
+                  style={styles.dogImage} 
+                />
+                <View style={styles.bookingInfo}>
+                  <Text style={styles.dogName}>{formatPetsList(booking)}</Text>
+                  <Text style={styles.dogBreed}>{owners[booking.owner_id]?.name || 'Loading owner...'}</Text>
+                  <View style={styles.bookingDetails}>
+                    <View style={styles.bookingDetailItem}>
+                      <Calendar size={14} color="#666" />
+                      <Text style={styles.bookingDetailText}>
+                        {formatBookingDate(booking.booking_date)}
+                      </Text>
+                    </View>
+                    <View style={styles.bookingDetailItem}>
+                      <Clock size={14} color="#666" />
+                      <Text style={styles.bookingDetailText}>{formatTimeRange(booking)}</Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         {/* Quick Actions Section */}
@@ -184,9 +436,27 @@ export default function HomeScreen() {
   );
 }
 
-import { Calendar, CircleCheck as CheckCircle, MessageSquare } from 'lucide-react-native';
+import { CircleCheck as CheckCircle, MessageSquare } from 'lucide-react-native';
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noBookingsContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F0F0',
+    borderRadius: 12,
+    marginHorizontal: 20,
+  },
+  noBookingsText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',

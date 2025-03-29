@@ -5,7 +5,7 @@ import { supabase, upsertProfile, getProfileById, uploadAvatar, updateAvatarUrl 
 
 export type UserRole = 'sitter';
 
-interface User {
+export interface User {
   id: string;
   name: string;
   email: string;

@@ -1,11 +1,128 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronRight, Bell, Shield, CreditCard, CircleHelp as HelpCircle, LogOut } from 'lucide-react-native';
+import { ChevronRight, Bell, Shield, CreditCard, CircleHelp as HelpCircle, LogOut, MapPin, Clock, CalendarX, AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { useAuthStore, User } from '../../store/useAuthStore';
+import EventRegister from '../../utils/EventRegister';
+
+// Import modal components
+import EditProfileModal from '../../components/profile/EditProfileModal';
+import AddressManagerModal from '../../components/profile/AddressManagerModal';
+import AvailabilityManagerModal from '../../components/profile/AvailabilityManagerModal';
+import UnavailabilityManagerModal from '../../components/profile/UnavailabilityManagerModal';
+import PaymentSetupModal from '../../components/profile/PaymentSetupModal';
+import { getPrimaryAddress } from '../../lib/supabase';
 
 export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const user = useAuthStore(state => state.user);
+  const refreshSession = useAuthStore(state => state.refreshSession);
+  
+  // Modal visibility states
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
+  const [isAvailabilityModalVisible, setIsAvailabilityModalVisible] = useState(false);
+  const [isUnavailabilityModalVisible, setIsUnavailabilityModalVisible] = useState(false);
+  const [isPaymentSetupModalVisible, setIsPaymentSetupModalVisible] = useState(false);
+  
+  // Other state variables
+  const [primaryAddress, setPrimaryAddress] = useState<any>(null);
+  const [editProfileForm, setEditProfileForm] = useState({
+    name: '',
+    email: '',
+    phoneNumber: '',
+    location: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  
+  // Load primary address when component mounts
+  useEffect(() => {
+    if (user?.id) {
+      loadPrimaryAddress();
+    }
+  }, [user?.id]);
+  
+  // Load primary address from Supabase
+  const loadPrimaryAddress = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const address = await getPrimaryAddress(user.id);
+      setPrimaryAddress(address);
+    } catch (error) {
+      console.error('Error loading primary address:', error);
+    }
+  };
+  
+  // Listen for edit profile modal open events
+  useEffect(() => {
+    const listener = EventRegister.addEventListener('openEditProfileModal', () => {
+      // Pre-fill form with existing user data
+      setEditProfileForm({
+        name: user?.name || '',
+        email: user?.email || '', 
+        phoneNumber: user?.phoneNumber || '',
+        location: user?.location || '',
+      });
+      setIsEditModalVisible(true);
+    });
+
+    return () => {
+      EventRegister.removeEventListener(listener);
+    };
+  }, [user]);
+  
+  const handleSubmitProfileUpdate = async () => {
+    try {
+      setIsSubmitting(true);
+      setFormError(null);
+      
+      // Validate form
+      if (!editProfileForm.name.trim()) {
+        setFormError('Name is required');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Create update object with proper typing
+      const updateData: Record<string, any> = {
+        name: editProfileForm.name,
+      };
+      
+      // Special handling for phone number
+      if (editProfileForm.phoneNumber) {
+        updateData.phone = editProfileForm.phoneNumber; 
+        updateData.phoneNumber = editProfileForm.phoneNumber;
+      }
+      
+      if (editProfileForm.location) {
+        updateData.location = editProfileForm.location;
+      }
+      
+      // Update profile in Supabase via store
+      await useAuthStore.getState().updateUser(updateData);
+      
+      // Close modal on success
+      setIsEditModalVisible(false);
+      
+      // Refresh the session to get updated user data
+      await refreshSession();
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      setFormError('Failed to update profile. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFormChange = (data: Partial<typeof editProfileForm>) => {
+    setEditProfileForm(prev => ({
+      ...prev,
+      ...data
+    }));
+  };
   
   const handleLogout = () => {
     Alert.alert(
@@ -18,7 +135,10 @@ export default function SettingsScreen() {
         },
         {
           text: 'Log Out',
-          onPress: () => router.replace('/auth'),
+          onPress: () => {
+            useAuthStore.getState().logout();
+            router.replace('/auth');
+          },
           style: 'destructive',
         },
       ]
@@ -35,7 +155,10 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => EventRegister.emit('openEditProfileModal')}
+          >
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Personal Information</Text>
               <Text style={styles.settingDescription}>Update your profile details</Text>
@@ -77,7 +200,10 @@ export default function SettingsScreen() {
             />
           </View>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => setIsAvailabilityModalVisible(true)}
+          >
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Availability</Text>
               <Text style={styles.settingDescription}>Set your working hours</Text>
@@ -85,42 +211,69 @@ export default function SettingsScreen() {
             <ChevronRight size={20} color="#8E8E93" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => setIsUnavailabilityModalVisible(true)}
+          >
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Service Area</Text>
-              <Text style={styles.settingDescription}>Set your service radius</Text>
+              <Text style={styles.settingLabel}>Unavailability</Text>
+              <Text style={styles.settingDescription}>Mark days you're not available</Text>
+            </View>
+            <ChevronRight size={20} color="#8E8E93" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => setIsAddressModalVisible(true)}
+          >
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Manage Addresses</Text>
+              <Text style={styles.settingDescription}>Set your service locations</Text>
             </View>
             <ChevronRight size={20} color="#8E8E93" />
           </TouchableOpacity>
         </View>
         
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payments</Text>
-          
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Payment Methods</Text>
-              <Text style={styles.settingDescription}>Manage your payment options</Text>
-            </View>
-            <ChevronRight size={20} color="#8E8E93" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Payout Information</Text>
-              <Text style={styles.settingDescription}>Set up your bank account</Text>
-            </View>
-            <ChevronRight size={20} color="#8E8E93" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Transaction History</Text>
-              <Text style={styles.settingDescription}>View your past transactions</Text>
-            </View>
-            <ChevronRight size={20} color="#8E8E93" />
-          </TouchableOpacity>
-        </View>
+        {user?.role === 'sitter' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payments</Text>
+            
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={() => setIsPaymentSetupModalVisible(true)}
+            >
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Payment Setup</Text>
+                <Text style={styles.settingDescription}>Set up your payment account</Text>
+              </View>
+              <ChevronRight size={20} color="#8E8E93" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.settingItem}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Payment Methods</Text>
+                <Text style={styles.settingDescription}>Manage your payment options</Text>
+              </View>
+              <ChevronRight size={20} color="#8E8E93" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.settingItem}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Payout Information</Text>
+                <Text style={styles.settingDescription}>Set up your bank account</Text>
+              </View>
+              <ChevronRight size={20} color="#8E8E93" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.settingItem}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Transaction History</Text>
+                <Text style={styles.settingDescription}>View your past transactions</Text>
+              </View>
+              <ChevronRight size={20} color="#8E8E93" />
+            </TouchableOpacity>
+          </View>
+        )}
         
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support</Text>
@@ -154,6 +307,14 @@ export default function SettingsScreen() {
             </View>
             <ChevronRight size={20} color="#8E8E93" />
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Privacy & Security</Text>
+              <Text style={styles.settingDescription}>Manage your privacy preferences</Text>
+            </View>
+            <ChevronRight size={20} color="#8E8E93" />
+          </TouchableOpacity>
         </View>
         
         <TouchableOpacity 
@@ -166,6 +327,59 @@ export default function SettingsScreen() {
         
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
+      
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isVisible={isEditModalVisible}
+        onClose={() => setIsEditModalVisible(false)}
+        formData={editProfileForm}
+        onFormChange={handleFormChange}
+        onSubmit={handleSubmitProfileUpdate}
+        isSubmitting={isSubmitting}
+        formError={formError}
+      />
+
+      {/* Address Manager Modal */}
+      <AddressManagerModal
+        isVisible={isAddressModalVisible}
+        onClose={() => setIsAddressModalVisible(false)}
+        onAddressSelected={(address) => {
+          // Refresh primary address when an address is selected/changed
+          loadPrimaryAddress();
+        }}
+      />
+
+      {/* Availability Manager Modal */}
+      <AvailabilityManagerModal
+        isVisible={isAvailabilityModalVisible}
+        onClose={() => setIsAvailabilityModalVisible(false)}
+        onAvailabilityUpdated={() => {
+          console.log('Availability updated successfully');
+        }}
+      />
+
+      {/* Unavailability Modal */}
+      <UnavailabilityManagerModal
+        isVisible={isUnavailabilityModalVisible}
+        onClose={() => setIsUnavailabilityModalVisible(false)}
+        onUnavailabilityUpdated={() => {
+          // Refresh data if needed after updating unavailability
+          loadPrimaryAddress();
+        }}
+      />
+
+      {/* Payment Setup Modal (For Sitters) */}
+      {user?.role === 'sitter' && (
+        <PaymentSetupModal
+          isVisible={isPaymentSetupModalVisible}
+          onClose={() => setIsPaymentSetupModalVisible(false)}
+          onSetupComplete={() => {
+            // Refresh session to get updated user data
+            refreshSession();
+            setIsPaymentSetupModalVisible(false);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }

@@ -12,6 +12,7 @@ import EditProfileModal from './EditProfileModal';
 import AddressManagerModal from './AddressManagerModal';
 import AvailabilityManagerModal from './AvailabilityManagerModal';
 import UnavailabilityManagerModal from './UnavailabilityManagerModal';
+import PaymentSetupModal from './PaymentSetupModal';
 import EventRegister from '../../utils/EventRegister';
 import { getPrimaryAddress } from '../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,6 +26,7 @@ interface ExtendedUser {
   phone?: string; // From store
   phoneNumber?: string; // From database
   location?: string;
+  stripe_account_id?: string; // For payment setup
 }
 
 const ProfileContent = () => {
@@ -32,6 +34,7 @@ const ProfileContent = () => {
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAvailabilityModalVisible, setIsAvailabilityModalVisible] = useState(false);
   const [isUnavailabilityModalVisible, setIsUnavailabilityModalVisible] = useState(false);
+  const [isPaymentSetupModalVisible, setIsPaymentSetupModalVisible] = useState(false);
   const [primaryAddress, setPrimaryAddress] = useState<any>(null);
   const [editProfileForm, setEditProfileForm] = useState({
     name: '',
@@ -312,6 +315,7 @@ const ProfileContent = () => {
           onAddressPress={() => setIsAddressModalVisible(true)}
           onAvailabilityPress={() => setIsAvailabilityModalVisible(true)}
           onUnavailabilityPress={() => setIsUnavailabilityModalVisible(true)}
+          onPaymentSetupPress={() => setIsPaymentSetupModalVisible(true)}
         />
         
         {/* Logout Button */}
@@ -358,6 +362,19 @@ const ProfileContent = () => {
         onClose={() => setIsUnavailabilityModalVisible(false)}
         onUnavailabilityUpdated={handleUnavailabilityUpdated}
       />
+
+      {/* Payment Setup Modal (For Sitters) */}
+      {user?.role === 'sitter' && (
+        <PaymentSetupModal
+          isVisible={isPaymentSetupModalVisible}
+          onClose={() => setIsPaymentSetupModalVisible(false)}
+          onSetupComplete={() => {
+            // Refresh session to get updated user data with stripe_account_id
+            refreshSession();
+            setIsPaymentSetupModalVisible(false);
+          }}
+        />
+      )}
     </>
   );
 };

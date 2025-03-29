@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { format, isAfter, isBefore, isSameDay, parseISO } from 'date-fns';
 
 export interface TimeSlot {
   id: string;
@@ -8,6 +9,15 @@ export interface TimeSlot {
 
 export interface DayAvailability {
   [day: string]: TimeSlot[];
+}
+
+export interface BoardingDate {
+  id: string;
+  available_date: string;
+}
+
+export interface BoardingAvailability {
+  dates: BoardingDate[];
 }
 
 export interface AvailabilityResponse {
@@ -132,6 +142,160 @@ export async function deleteUserAvailability(userId: string): Promise<void> {
   } catch (error) {
     console.error('Error in deleteUserAvailability:', error);
     throw error;
+  }
+}
+
+/**
+ * Fetch a user's boarding availability settings
+ * @param userId The ID of the user whose boarding availability to fetch
+ * @returns The user's boarding availability dates
+ */
+export async function fetchUserBoardingAvailability(userId: string): Promise<BoardingDate[]> {
+  try {
+    // Get current date without time
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const { data, error } = await supabase
+      .from('boarding_availability')
+      .select('*')
+      .eq('sitter_id', userId)
+      .gte('available_date', today.toISOString())
+      .order('available_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching boarding availability:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error in fetchUserBoardingAvailability:', error);
+    return [];
+  }
+}
+
+/**
+ * Check if a day is unavailable due to walking unavailability
+ * @param userId The ID of the user
+ * @param date The date to check
+ * @returns True if the day has walking unavailability, false otherwise
+ */
+export async function checkDayHasUnavailability(userId: string, date: Date): Promise<boolean> {
+  try {
+    // Get the formatted date string
+    const dateStr = format(date, 'yyyy-MM-dd');
+    console.log(`Checking unavailability for user ${userId} on date ${dateStr}`);
+    
+    // We now know the column is called 'unavailable_date'
+    const { data, error } = await supabase
+      .from('sitter_unavailability')
+      .select('*')
+      .eq('sitter_id', userId)
+      .eq('unavailable_date', dateStr);
+
+    if (error) {
+      console.error('Error checking day unavailability:', error);
+      return false;
+    }
+
+    return Boolean(data && data.length > 0);
+  } catch (error) {
+    console.error('Error in checkDayHasUnavailability:', error);
+    return false;
+  }
+}
+
+/**
+ * Save or update a user's boarding availability settings
+ * @param userId The ID of the user whose boarding availability to update
+ * @param dates Array of dates the user is available for boarding
+ * @returns True if successfully updated, false otherwise
+ */
+export async function saveUserBoardingAvailability(
+  userId: string,
+  dates: Date[]
+): Promise<{ success: boolean, error?: string }> {
+  if (!userId) {
+    console.error('saveUserBoardingAvailability called with no userId');
+    return { success: false, error: 'User ID is required' };
+  }
+  
+  if (!dates || !Array.isArray(dates)) {
+    console.error('saveUserBoardingAvailability called with invalid dates:', dates);
+    return { success: false, error: 'Valid dates array is required' };
+  }
+
+  console.log(`Saving boarding availability for user ${userId}, ${dates.length} dates`);
+  
+  try {
+    // First, fetch existing dates to determine what to add/remove
+    const existingDates = await fetchUserBoardingAvailability(userId);
+    const existingDateStrings = existingDates.map(d => d.available_date);
+    
+    // Format new dates as ISO strings (date only)
+    const newDateStrings = dates.map(d => format(d, 'yyyy-MM-dd'));
+    console.log('New date strings to save:', newDateStrings);
+    
+    // Determine dates to add (in new but not in existing)
+    const datesToAdd = newDateStrings.filter(d => !existingDateStrings.includes(d));
+    
+    // Determine dates to remove (in existing but not in new)
+    const datesToRemove = existingDates.filter(d => !newDateStrings.includes(d.available_date));
+    
+    console.log(`Found ${datesToAdd.length} dates to add and ${datesToRemove.length} dates to remove`);
+    
+    // Remove dates that are no longer in the list
+    if (datesToRemove.length > 0) {
+      const idsToRemove = datesToRemove.map(d => d.id);
+      console.log('Removing boarding dates with IDs:', idsToRemove);
+      
+      const { error: deleteError } = await supabase
+        .from('boarding_availability')
+        .delete()
+        .in('id', idsToRemove);
+      
+      if (deleteError) {
+        console.error('Error removing boarding dates:', deleteError);
+        return { success: false, error: 'Failed to remove dates: ' + deleteError.message };
+      }
+    }
+    
+    // Add new dates
+    if (datesToAdd.length > 0) {
+      console.log('Adding boarding dates:', datesToAdd);
+      
+      // Create properly formatted entries for insertion
+      const newEntries = datesToAdd.map(dateStr => ({
+        sitter_id: userId,
+        available_date: dateStr, // This should already be in YYYY-MM-DD format
+      }));
+      
+      console.log('New entries to insert:', JSON.stringify(newEntries));
+      
+      const { data, error: insertError } = await supabase
+        .from('boarding_availability')
+        .insert(newEntries)
+        .select();
+      
+      if (insertError) {
+        console.error('Error adding boarding dates:', insertError);
+        return { success: false, error: 'Failed to add dates: ' + insertError.message };
+      }
+      
+      console.log('Successfully added boarding dates:', data?.length || 0, 'entries');
+    } else {
+      console.log('No new boarding dates to add');
+    }
+    
+    // Verify the updated data
+    const updatedDates = await fetchUserBoardingAvailability(userId);
+    console.log(`After save: User now has ${updatedDates.length} boarding dates`);
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in saveUserBoardingAvailability:', error);
+    return { success: false, error: error.message || 'An unknown error occurred' };
   }
 }
 
@@ -521,4 +685,64 @@ export function identifyChangedTimeSlots(
   });
   
   return { added, modified, unchanged, removed };
-} 
+}
+
+/**
+ * Checks if a date is already in an array of dates
+ * @param date The date to check
+ * @param dateArray Array of dates to check against
+ * @returns True if the date is in the array, false otherwise
+ */
+export function isDateInArray(date: Date, dateArray: Date[]): boolean {
+  return dateArray.some(d => isSameDay(d, date));
+}
+
+/**
+ * Adds a date to an array of dates if it's not already there
+ * @param date The date to add
+ * @param dateArray Array of dates to add to
+ * @returns Updated array of dates
+ */
+export function addDateToArray(date: Date, dateArray: Date[]): Date[] {
+  if (isDateInArray(date, dateArray)) return dateArray;
+  return [...dateArray, date];
+}
+
+/**
+ * Removes a date from an array of dates
+ * @param date The date to remove
+ * @param dateArray Array of dates to remove from
+ * @returns Updated array of dates
+ */
+export function removeDateFromArray(date: Date, dateArray: Date[]): Date[] {
+  return dateArray.filter(d => !isSameDay(d, date));
+}
+
+/**
+ * Converts a string date to a Date object
+ * @param dateString Date string in format YYYY-MM-DD
+ * @returns Date object
+ */
+export function stringToDate(dateString: string): Date {
+  return parseISO(dateString);
+}
+
+/**
+ * Converts BoardingDate[] from API to Date[] for UI
+ * @param boardingDates Array of BoardingDate objects from API
+ * @returns Array of Date objects
+ */
+export function boardingDatesToDateArray(boardingDates: BoardingDate[]): Date[] {
+  if (!boardingDates || !Array.isArray(boardingDates)) {
+    console.warn('Invalid boardingDates input:', boardingDates);
+    return [];
+  }
+  
+  return boardingDates.map(d => {
+    if (!d || !d.available_date) {
+      console.warn('Invalid boarding date entry:', d);
+      return new Date(); // Return current date as fallback
+    }
+    return stringToDate(d.available_date);
+  });
+}
