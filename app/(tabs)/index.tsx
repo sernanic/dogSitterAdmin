@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, DollarSign, Star, Clock, Users, MapPin, Calendar } from 'lucide-react-native';
-import { supabase } from '../../lib/supabase';
+import { supabase, getSitterStats, getSitterEarnings, SitterStats, SitterEarnings } from '../../lib/supabase';
 import { format, parseISO } from 'date-fns';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -52,21 +52,26 @@ interface Booking {
   pets?: Pet[];
 }
 
-// Mock data for earnings
-const earningsData = {
-  today: '$45',
-  thisWeek: '$320',
-  thisMonth: '$1,250',
-};
+
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
-    totalBookings: 24,
-    completedBookings: 18,
-    averageRating: 4.8,
-    totalClients: 12,
+    totalBookings: 0,
+    completedBookings: 0,
+    averageRating: 0,
+    totalClients: 0,
   });
+  const [earningsData, setEarningsData] = useState<SitterEarnings>({
+    today: '$0.00',
+    thisWeek: '$0.00',
+    thisMonth: '$0.00',
+    totalEarnings: '$0.00',
+    paidInvoicesCount: 0,
+    pendingInvoicesCount: 0
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingEarnings, setLoadingEarnings] = useState(true);
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [owners, setOwners] = useState<{[key: string]: Profile}>({});
   const [pets, setPets] = useState<{[key: string]: Pet}>({});
@@ -75,12 +80,65 @@ export default function HomeScreen() {
   // Get the current authenticated user
   const { user, isAuthenticated } = useAuthStore();
 
-  // Fetch the upcoming bookings when the component loads
+  // Fetch sitter stats from the database
+  const fetchSitterStats = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingStats(true);
+      const sitterStats = await getSitterStats(user.id);
+      
+      // Update the stats state with real data
+      setStats({
+        totalBookings: sitterStats.total_bookings,
+        completedBookings: sitterStats.completed_bookings,
+        averageRating: parseFloat(sitterStats.average_rating.toFixed(1)),
+        totalClients: sitterStats.total_clients,
+      });
+    } catch (error) {
+      console.error('Error fetching sitter stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  // Fetch sitter earnings from the database
+  const fetchSitterEarnings = async () => {
+    if (!user) {
+      setLoadingEarnings(false);
+      return;
+    }
+    
+    try {
+      setLoadingEarnings(true);
+      const earnings = await getSitterEarnings(user.id);
+      setEarningsData(earnings);
+    } catch (error) {
+      console.error('Error fetching sitter earnings:', error);
+      // Set default values on error
+      setEarningsData({
+        today: '$0.00',
+        thisWeek: '$0.00',
+        thisMonth: '$0.00',
+        totalEarnings: '$0.00',
+        paidInvoicesCount: 0,
+        pendingInvoicesCount: 0
+      });
+    } finally {
+      setLoadingEarnings(false);
+    }
+  };
+
+  // Fetch the data when the component loads
   useEffect(() => {
     if (isAuthenticated && user) {
       fetchUpcomingBookings();
+      fetchSitterStats();
+      fetchSitterEarnings();
     } else {
       setLoadingBookings(false);
+      setLoadingStats(false);
+      setLoadingEarnings(false);
     }
   }, [isAuthenticated, user]);
 
@@ -264,11 +322,19 @@ export default function HomeScreen() {
   };
   
   // Refresh function for pull-to-refresh
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchUpcomingBookings().then(() => {
+    try {
+      await Promise.all([
+        fetchUpcomingBookings(),
+        fetchSitterStats(),
+        fetchSitterEarnings()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
       setRefreshing(false);
-    });
+    }
   };
 
   return (
@@ -292,20 +358,26 @@ export default function HomeScreen() {
         {/* Earnings Section */}
         <View style={styles.earningsCard}>
           <Text style={styles.sectionTitle}>Earnings</Text>
-          <View style={styles.earningsRow}>
-            <View style={styles.earningsItem}>
-              <Text style={styles.earningsLabel}>Today</Text>
-              <Text style={styles.earningsValue}>{earningsData.today}</Text>
+          {loadingEarnings ? (
+            <View style={[styles.loadingContainer, { minHeight: 80 }]}>
+              <ActivityIndicator size="large" color="#62C6B9" />
             </View>
-            <View style={styles.earningsItem}>
-              <Text style={styles.earningsLabel}>This Week</Text>
-              <Text style={styles.earningsValue}>{earningsData.thisWeek}</Text>
+          ) : (
+            <View style={styles.earningsRow}>
+              <View style={styles.earningsItem}>
+                <Text style={styles.earningsLabel}>Today</Text>
+                <Text style={styles.earningsValue}>{earningsData.today}</Text>
+              </View>
+              <View style={styles.earningsItem}>
+                <Text style={styles.earningsLabel}>This Week</Text>
+                <Text style={styles.earningsValue}>{earningsData.thisWeek}</Text>
+              </View>
+              <View style={styles.earningsItem}>
+                <Text style={styles.earningsLabel}>This Month</Text>
+                <Text style={styles.earningsValue}>{earningsData.thisMonth}</Text>
+              </View>
             </View>
-            <View style={styles.earningsItem}>
-              <Text style={styles.earningsLabel}>This Month</Text>
-              <Text style={styles.earningsValue}>{earningsData.thisMonth}</Text>
-            </View>
-          </View>
+          )}
         </View>
 
         {/* Stats Section */}
@@ -314,7 +386,11 @@ export default function HomeScreen() {
             <View style={[styles.statIconContainer, { backgroundColor: '#E8F1FF' }]}>
               <Calendar size={20} color="#62C6B9" />
             </View>
-            <Text style={styles.statValue}>{stats.totalBookings}</Text>
+            {loadingStats ? (
+              <ActivityIndicator size="small" color="#62C6B9" style={styles.statLoading} />
+            ) : (
+              <Text style={styles.statValue}>{stats.totalBookings}</Text>
+            )}
             <Text style={styles.statLabel}>Total Bookings</Text>
           </View>
           
@@ -322,7 +398,11 @@ export default function HomeScreen() {
             <View style={[styles.statIconContainer, { backgroundColor: '#FFF2E8' }]}>
               <CheckCircle size={20} color="#FF8C42" />
             </View>
-            <Text style={styles.statValue}>{stats.completedBookings}</Text>
+            {loadingStats ? (
+              <ActivityIndicator size="small" color="#FF8C42" style={styles.statLoading} />
+            ) : (
+              <Text style={styles.statValue}>{stats.completedBookings}</Text>
+            )}
             <Text style={styles.statLabel}>Completed</Text>
           </View>
           
@@ -330,7 +410,11 @@ export default function HomeScreen() {
             <View style={[styles.statIconContainer, { backgroundColor: '#FFF8E8' }]}>
               <Star size={20} color="#FFB800" />
             </View>
-            <Text style={styles.statValue}>{stats.averageRating}</Text>
+            {loadingStats ? (
+              <ActivityIndicator size="small" color="#FFB800" style={styles.statLoading} />
+            ) : (
+              <Text style={styles.statValue}>{stats.averageRating}</Text>
+            )}
             <Text style={styles.statLabel}>Avg. Rating</Text>
           </View>
           
@@ -338,7 +422,11 @@ export default function HomeScreen() {
             <View style={[styles.statIconContainer, { backgroundColor: '#E8FFF1' }]}>
               <Users size={20} color="#4CAF50" />
             </View>
-            <Text style={styles.statValue}>{stats.totalClients}</Text>
+            {loadingStats ? (
+              <ActivityIndicator size="small" color="#4CAF50" style={styles.statLoading} />
+            ) : (
+              <Text style={styles.statValue}>{stats.totalClients}</Text>
+            )}
             <Text style={styles.statLabel}>Clients</Text>
           </View>
         </View>
@@ -404,33 +492,6 @@ export default function HomeScreen() {
             ))
           )}
         </View>
-
-        {/* Quick Actions Section */}
-        <View style={styles.quickActionsSection}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActionsRow}>
-            <TouchableOpacity style={styles.quickActionButton}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#E8F1FF' }]}>
-                <Calendar size={24} color="#62C6B9" />
-              </View>
-              <Text style={styles.quickActionText}>Set Availability</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionButton}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#FFF2E8' }]}>
-                <DollarSign size={24} color="#FF8C42" />
-              </View>
-              <Text style={styles.quickActionText}>Update Pricing</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionButton}>
-              <View style={[styles.quickActionIcon, { backgroundColor: '#E8FFF1' }]}>
-                <MessageSquare size={24} color="#4CAF50" />
-              </View>
-              <Text style={styles.quickActionText}>Send Update</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -443,6 +504,9 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  statLoading: {
+    marginVertical: 8,
   },
   noBookingsContainer: {
     padding: 20,

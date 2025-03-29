@@ -18,13 +18,51 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    flowType: 'pkce',
   },
+});
+
+// Set up auth state listener
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Supabase auth event:', event);
 });
 
 // Helper function to get current user
 export const getCurrentUser = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
+};
+
+// Interface for sitter stats
+export interface SitterStats {
+  total_bookings: number;
+  completed_bookings: number;
+  average_rating: number;
+  total_clients: number;
+  last_updated_at: string;
+}
+
+// Helper function to get sitter stats
+export const getSitterStats = async (sitterId: string): Promise<SitterStats> => {
+  const { data, error } = await supabase
+    .from('sitter_stats')
+    .select('*')
+    .eq('sitter_id', sitterId)
+    .single();
+    
+  if (error) {
+    console.error('Error fetching sitter stats:', error);
+    // Return default values if no stats found
+    return {
+      total_bookings: 0,
+      completed_bookings: 0,
+      average_rating: 0,
+      total_clients: 0,
+      last_updated_at: new Date().toISOString()
+    };
+  }
+  
+  return data;
 };
 
 // Helper function to get current session
@@ -490,6 +528,190 @@ export const clearSitterUnavailableDates = async (sitterId: string): Promise<voi
     throw error;
   }
 }; 
+
+// Interface for sitter earnings data
+export interface SitterEarnings {
+  today: string;
+  thisWeek: string;
+  thisMonth: string;
+  totalEarnings: string;
+  paidInvoicesCount: number;
+  pendingInvoicesCount: number;
+}
+
+// Helper function to get sitter earnings data
+export const getSitterEarnings = async (sitterId: string): Promise<SitterEarnings> => {
+  try {
+    // First try to get from the summary view which is faster
+    const { data, error } = await supabase
+      .from('sitter_earnings_summary')
+      .select('*')
+      .eq('sitter_id', sitterId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching sitter earnings from summary view:', error);
+      
+      // Fallback: Call the function directly
+      const { data: functionData, error: functionError } = await supabase
+        .rpc('get_sitter_earnings', { p_sitter_id: sitterId });
+      
+      if (functionError) {
+        console.error('Error fetching sitter earnings via function:', functionError);
+        // Return default values if all methods fail
+        return {
+          today: '$0.00',
+          thisWeek: '$0.00',
+          thisMonth: '$0.00',
+          totalEarnings: '$0.00',
+          paidInvoicesCount: 0,
+          pendingInvoicesCount: 0
+        };
+      }
+      
+      // Process function data
+      const today = functionData.find((item: any) => item.period === 'today');
+      const thisWeek = functionData.find((item: any) => item.period === 'this_week');
+      const thisMonth = functionData.find((item: any) => item.period === 'this_month');
+      
+      return {
+        today: formatCurrency(today?.earnings || 0),
+        thisWeek: formatCurrency(thisWeek?.earnings || 0),
+        thisMonth: formatCurrency(thisMonth?.earnings || 0),
+        totalEarnings: '$0.00', // Not available from function call
+        paidInvoicesCount: (today?.bookings_count || 0) + (thisWeek?.bookings_count || 0) + (thisMonth?.bookings_count || 0),
+        pendingInvoicesCount: 0 // Not available from function call
+      };
+    }
+    
+    // Process data from summary view
+    return {
+      today: formatCurrency(data.today_earnings || 0),
+      thisWeek: formatCurrency(data.weekly_earnings || 0),
+      thisMonth: formatCurrency(data.monthly_earnings || 0),
+      totalEarnings: formatCurrency(data.total_earnings || 0),
+      paidInvoicesCount: data.paid_invoices_count || 0,
+      pendingInvoicesCount: data.pending_invoices_count || 0
+    };
+  } catch (error) {
+    console.error('Error in getSitterEarnings:', error);
+    return {
+      today: '$0.00',
+      thisWeek: '$0.00',
+      thisMonth: '$0.00',
+      totalEarnings: '$0.00',
+      paidInvoicesCount: 0,
+      pendingInvoicesCount: 0
+    };
+  }
+};
+
+// Helper function to format currency values
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+};
+
+// SitterInfo interface for storing sitter rates
+export interface SitterInfo {
+  id: string;
+  sitter_id: string;
+  walking_rate_per_hour: number;
+  walking_rate_for_additional_dog: number;
+  boarding_rate_per_day: number;
+  boarding_rate_for_additional_dog: number;
+  max_dogs_walking: number;
+  max_dogs_boarding: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Helper function to get sitter info by sitter ID
+export const getSitterInfo = async (sitterId: string): Promise<SitterInfo | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('sitter_info')
+      .select('*')
+      .eq('sitter_id', sitterId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching sitter info:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in getSitterInfo:', error);
+    return null;
+  }
+};
+
+// Helper function to update walking rates
+export const updateWalkingRates = async (
+  sitterId: string,
+  ratePerHour: number,
+  rateForAdditionalDog: number,
+  maxDogs: number
+): Promise<SitterInfo | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('sitter_info')
+      .upsert({
+        sitter_id: sitterId,
+        walking_rate_per_hour: ratePerHour,
+        walking_rate_for_additional_dog: rateForAdditionalDog,
+        max_dogs_walking: maxDogs
+      }, { onConflict: 'sitter_id' })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating walking rates:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in updateWalkingRates:', error);
+    return null;
+  }
+};
+
+// Helper function to update boarding rates
+export const updateBoardingRates = async (
+  sitterId: string,
+  ratePerDay: number,
+  rateForAdditionalDog: number,
+  maxDogs: number
+): Promise<SitterInfo | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('sitter_info')
+      .upsert({
+        sitter_id: sitterId,
+        boarding_rate_per_day: ratePerDay,
+        boarding_rate_for_additional_dog: rateForAdditionalDog,
+        max_dogs_boarding: maxDogs
+      }, { onConflict: 'sitter_id' })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating boarding rates:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in updateBoardingRates:', error);
+    return null;
+  }
+};
 
 // Portfolio image interface
 export interface PortfolioImage {
