@@ -49,7 +49,7 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
 
       // Send password reset email through Supabase
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'pawsitter://auth/reset-password',
+        redirectTo: 'pikpup://auth/reset-password',
       });
 
       if (resetError) {

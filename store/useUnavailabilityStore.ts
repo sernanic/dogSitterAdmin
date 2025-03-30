@@ -1,15 +1,23 @@
 import { create } from 'zustand';
-import { UnavailableTimeSlot, DateUnavailability, fetchUserUnavailability, saveUserUnavailability } from '../lib/unavailability';
+import { fetchUserUnavailability, saveUserUnavailability } from '../lib/unavailability';
+
+export interface MarkedDateData {
+  selected: boolean;
+  selectedColor: string;
+  // Add other properties if needed by react-native-calendars (e.g., disabled, dotColor)
+}
+
+export type SimpleDateUnavailability = { [date: string]: MarkedDateData };
 
 interface UnavailabilityState {
-  unavailability: DateUnavailability;
+  unavailability: SimpleDateUnavailability;
   isLoading: boolean;
   error: string | null;
   
   // Actions
-  setUnavailability: (unavailability: DateUnavailability) => void;
+  setUnavailability: (unavailability: SimpleDateUnavailability) => void;
   fetchUnavailability: (userId: string) => Promise<void>;
-  saveUnavailability: (userId: string, unavailability: DateUnavailability) => Promise<boolean>;
+  saveUnavailability: (userId: string, unavailability: SimpleDateUnavailability) => Promise<boolean>;
   clearUnavailability: () => void;
 }
 
@@ -25,16 +33,22 @@ export const useUnavailabilityStore = create<UnavailabilityState>((set, get) => 
     
     try {
       console.log('[useUnavailabilityStore] Starting fetch for user:', userId);
-      const response = await fetchUserUnavailability(userId);
+      const fetchedUnavailability = await fetchUserUnavailability(userId); 
       
-      if (!response) {
-        throw new Error('Failed to fetch unavailability data');
+      if (!fetchedUnavailability) {
+        console.warn('[useUnavailabilityStore] Fetch returned null or empty data');
+        set({ 
+          unavailability: {}, 
+          isLoading: false,
+          // Optionally set an error message here if needed
+          // error: 'Failed to fetch unavailability data' 
+        });
+        return; // Exit early
       }
       
-      // Process the response and update the store
-      console.log('[useUnavailabilityStore] Fetch completed, updating state');
+      console.log('[useUnavailabilityStore] Fetch completed, updating state with:', fetchedUnavailability);
       set({ 
-        unavailability: response.unavailable_dates || {}, 
+        unavailability: fetchedUnavailability, // Use the fetched map directly
         isLoading: false 
       });
       console.log('[useUnavailabilityStore] State updated, isLoading set to false');
@@ -54,15 +68,15 @@ export const useUnavailabilityStore = create<UnavailabilityState>((set, get) => 
     set({ isLoading: true, error: null });
     
     try {
-      const response = await saveUserUnavailability(userId, unavailability);
+      const success = await saveUserUnavailability(userId, unavailability);
       
-      if (!response) {
-        throw new Error('Failed to save unavailability data');
+      if (!success) {
+        throw new Error('Save operation indicated failure');
       }
       
-      // Update the store with the saved data
+      console.log('[useUnavailabilityStore] Save successful, updating state');
       set({ 
-        unavailability: response.unavailable_dates || unavailability, 
+        unavailability: unavailability, 
         isLoading: false 
       });
       
@@ -80,4 +94,4 @@ export const useUnavailabilityStore = create<UnavailabilityState>((set, get) => 
   clearUnavailability: () => {
     set({ unavailability: {} });
   }
-})); 
+}));

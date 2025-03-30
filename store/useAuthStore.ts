@@ -101,7 +101,7 @@ export const useAuthStore = create<AuthState>()(
           const { data, error } = await supabase.auth.signInWithOAuth({
             provider: provider as any,
             options: {
-              redirectTo: 'pawsitter://auth/callback',
+              redirectTo: 'pikpup://auth/callback',
             },
           });
           

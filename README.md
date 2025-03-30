@@ -1,4 +1,4 @@
-# PawSitter - Dog Sitter Admin App
+# pikpup - Dog Sitter Admin App
 
 A mobile application for pet sitters to manage their services, bookings, and client interactions.
 

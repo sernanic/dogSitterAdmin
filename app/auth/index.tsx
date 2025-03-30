@@ -67,7 +67,7 @@ export default function Login() {
             source={{ uri: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=200&auto=format&fit=crop' }}
             style={styles.logo}
           />
-          <Text style={styles.appName}>PawSitter</Text>
+          <Text style={styles.appName}>pikpup</Text>
           <Text style={styles.tagline}>Connect with dog owners and grow your pet sitting business</Text>
         </View>
 

@@ -1,4 +1,4 @@
--- This file contains SQL statements to set up your Supabase database for the PawSitter app
+-- This file contains SQL statements to set up your Supabase database for the pikpup app
 -- Run these statements in your Supabase SQL Editor
 
 -- 1. Create or replace the function for profile creation

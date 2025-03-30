@@ -1,19 +1,19 @@
 {
   "expo": {
-    "name": "PawSitter",
-    "slug": "pawsitter-dog-sitter-admin",
+    "name": "pikpup",
+    "slug": "pikpup-dog-sitter-admin",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "pawsitter",
+    "scheme": "pikpup",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nicolasserna.pawsitter"
+      "bundleIdentifier": "com.nicolasserna.pikpup"
     },
     "android": {
-      "package": "com.nicolasserna.pawsitter",
+      "package": "com.nicolasserna.pikpup",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
@@ -24,7 +24,7 @@
           "autoVerify": true,
           "data": [
             {
-              "scheme": "pawsitter",
+              "scheme": "pikpup",
               "host": "auth",
               "pathPrefix": "/reset-password"
             }

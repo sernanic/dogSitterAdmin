@@ -1,6 +1,6 @@
 export default {
-  name: "PawSitter",
-  slug: "pawsitter",
+  name: "pikpup",
+  slug: "pikpup",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -17,8 +17,8 @@ export default {
   ios: {
     supportsTablet: true,
     infoPlist: {
-      NSPhotoLibraryUsageDescription: "Allow PawSitter to access your photos to update your profile picture",
-      NSCameraUsageDescription: "Allow PawSitter to access your camera to take profile pictures"
+      NSPhotoLibraryUsageDescription: "Allow pikpup to access your photos to update your profile picture",
+      NSCameraUsageDescription: "Allow pikpup to access your camera to take profile pictures"
     }
   },
   android: {
@@ -40,12 +40,12 @@ export default {
     [
       "expo-image-picker",
       {
-        "photosPermission": "Allow PawSitter to access your photos to update your profile picture",
-        "cameraPermission": "Allow PawSitter to access your camera to take profile pictures"
+        "photosPermission": "Allow pikpup to access your photos to update your profile picture",
+        "cameraPermission": "Allow pikpup to access your camera to take profile pictures"
       }
     ]
   ],
-  scheme: "pawsitter",
+  scheme: "pikpup",
   // Environment variables and other extras
   extra: {
     eas: {
