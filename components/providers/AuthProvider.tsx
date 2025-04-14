@@ -1,7 +1,7 @@
 import React, { ReactNode, useEffect, useState, useCallback, useRef } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { router, usePathname } from 'expo-router';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
 interface AuthProviderProps {
@@ -29,12 +29,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       clearTimeout(timeoutRef.current);
     }
 
-    // Set a timeout to prevent infinite loading
+    // Set a shorter timeout to prevent long loading
     timeoutRef.current = setTimeout(() => {
       console.warn('Auth initialization timed out');
       setInitError('Authentication initialization timed out');
       setIsInitializing(false);
-    }, 10000); // 10 seconds timeout
+    }, 3000); // Reduced from 10s to 3s
 
     try {
       await refreshSession();
@@ -101,12 +101,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
+  // Return children immediately without showing a spinner
   if (isInitializing) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
+    return <>{children}</>;
   }
   
   // Show error screen if there was an initialization error

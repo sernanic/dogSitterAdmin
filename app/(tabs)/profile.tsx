@@ -1,4 +1,3 @@
-
 // ProfileScreen.tsx with Instagram-like layout
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -14,14 +13,17 @@ import {
   ActivityIndicator,
   Platform,
   ToastAndroid,
-  Dimensions
+  Dimensions,
+  ImageSourcePropType,
+  ImageBackground
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import ProtectedRoute from '../../components/auth/ProtectedRoute';
 import { useAuthStore } from '../../store/useAuthStore';
-import { getPortfolioImages, uploadPortfolioImage, deletePortfolioImage, PortfolioImage } from '../../lib/supabase';
-import { Camera, Plus, Grid3x3, X, Settings, ImageIcon, Images } from 'lucide-react-native';
+import { getPortfolioImages, uploadPortfolioImage, deletePortfolioImage, PortfolioImage, uploadAvatar, updateAvatarUrl, uploadProfileBackground, updateBackgroundUrl } from '../../lib/supabase';
+import { Camera, Plus, Grid3x3, X, Settings, ImageIcon, Images, Edit2 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import EditProfileModal from '../../components/profile/EditProfileModal';
 
@@ -41,14 +43,26 @@ export default function ProfileScreen() {
     email: '',
     phoneNumber: '',
     location: '',
+    avatar_url: '',
+    background_url: '',
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingBackground, setUploadingBackground] = useState(false);
 
   // Fetch portfolio images on component mount
   useEffect(() => {
     if (user) {
       fetchPortfolioImages();
+      // Initialize form data with user info
+      setEditProfileForm({
+        name: user.name || '',
+        email: user.email || '',
+        phoneNumber: user.phoneNumber || '',
+        location: user.location || '',
+        avatar_url: user.avatar_url || '',
+        background_url: user.background_url || '',
+      });
     }
   }, [user]);
 
@@ -66,6 +80,94 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  // Handle avatar upload
+  const handleAvatarUpload = async (uri: string) => {
+    if (!user) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      // Upload avatar to storage
+      const avatarUrl = await uploadAvatar(user.id, uri);
+      
+      // Update profile with new avatar URL
+      await updateAvatarUrl(user.id, avatarUrl);
+      
+      // Update local state
+      setEditProfileForm(prev => ({ ...prev, avatar_url: avatarUrl }));
+      
+      // Update user in auth store
+      updateUser({ ...user, avatar_url: avatarUrl });
+      
+      // Show success message
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Profile picture updated successfully!', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      Alert.alert('Error', 'Could not update profile picture');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle background image upload
+  const handleBackgroundUpload = async () => {
+    if (!user) return;
+    
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Required", "You need to allow gallery access to upload photos.");
+        return;
+      }
+      
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploadingBackground(true);
+        
+        try {
+          // Upload background to storage
+          const backgroundUrl = await uploadProfileBackground(user.id, result.assets[0].uri);
+          
+          // Update profile with new background URL
+          await updateBackgroundUrl(user.id, backgroundUrl);
+          
+          // Update local state
+          setEditProfileForm(prev => ({ ...prev, background_url: backgroundUrl }));
+          
+          // Update user in auth store
+          updateUser({ ...user, background_url: backgroundUrl });
+          
+          // Show success message
+          if (Platform.OS === 'android') {
+            ToastAndroid.show('Background updated successfully!', ToastAndroid.SHORT);
+          } else {
+            Alert.alert('Success', 'Background updated successfully!');
+          }
+        } catch (error) {
+          console.error('Error uploading background:', error);
+          Alert.alert('Error', 'Could not update background image');
+        } finally {
+          setUploadingBackground(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error launching image library:', error);
+      Alert.alert('Error', 'Could not open gallery');
+      setUploadingBackground(false);
     }
   };
 
@@ -233,6 +335,8 @@ export default function ProfileScreen() {
       email: user.email || '',
       phoneNumber: user.phoneNumber || '',
       location: user.location || '',
+      avatar_url: user.avatar_url || '',
+      background_url: user.background_url || '',
     });
     
     setIsEditModalVisible(true);
@@ -337,7 +441,6 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
           <TouchableOpacity onPress={() => router.push('/settings/')}>
-
             <Settings size={24} color="#333" />
           </TouchableOpacity>
         </View>
@@ -353,31 +456,60 @@ export default function ProfileScreen() {
             />
           }
         >
-          <View style={styles.profileHeader}>
-            <TouchableOpacity onPress={handleEditProfile}>
-              <Image 
-                source={{ 
-                  uri: user.avatar_url || 'https://via.placeholder.com/150' 
-                }} 
-                style={styles.profileImage} 
-              />
-            </TouchableOpacity>
+          {/* Background Image Area */}
+          <View style={styles.backgroundContainer}>
+            <ImageBackground 
+              source={user.background_url ? { uri: user.background_url } : require('../../assets/images/default-background.jpg')} 
+              style={styles.backgroundImage}
+              resizeMode="cover"
+            >
+              <TouchableOpacity 
+                style={styles.editBackgroundButton} 
+                onPress={handleBackgroundUpload}
+                disabled={uploadingBackground}
+              >
+                {uploadingBackground ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Edit2 size={16} color="#FFF" />
+                )}
+              </TouchableOpacity>
+              
+              <View style={styles.profileImageContainer}>
+                <TouchableOpacity onPress={handleEditProfile}>
+                  {user.avatar_url ? (
+                    <Image 
+                      source={{ uri: user.avatar_url }}
+                      style={styles.profileImage}
+                    />
+                  ) : (
+                    <View style={[styles.profileImage, styles.profileImagePlaceholder]}>
+                      <Ionicons name="person" size={40} color="#999" />
+                    </View>
+                  )}
+                  <View style={styles.editProfileButton}>
+                    <Ionicons name="pencil" size={16} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </ImageBackground>
+          </View>
+          
+          <View style={styles.profileInfoCard}>
+            <Text style={styles.profileName}>{user.name}</Text>
             
             <View style={styles.profileStats}>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>{portfolioImages.length}</Text>
                 <Text style={styles.statLabel}>Photos</Text>
               </View>
-              
-              <TouchableOpacity style={styles.statItem} onPress={handleEditProfile}>
-                <Text style={styles.userName}>{user.name}</Text>
-                <Text style={styles.userRole}>Dog Sitter</Text>
-              </TouchableOpacity>
             </View>
-          </View>
-          
-          <View style={styles.bioSection}>
-            <Text style={styles.bioText}>{user.location || 'Add your location in profile settings'}</Text>
+            
+            {user.location && (
+              <View style={styles.bioSection}>
+                <Text style={styles.bioText}>{user.location}</Text>
+              </View>
+            )}
           </View>
           
           <View style={styles.portfolioHeader}>
@@ -436,6 +568,7 @@ export default function ProfileScreen() {
           onSubmit={handleSubmitProfileUpdate}
           isSubmitting={isSubmitting}
           formError={formError}
+          onUploadAvatar={handleAvatarUpload}
         />
       </SafeAreaView>
     </ProtectedRoute>
@@ -443,6 +576,39 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  profileImagePlaceholder: {
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+    fontFamily: 'Inter-Bold',
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: '#666',
+  },
+  editProfileButton: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#62C6B9',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  profileInfo: {
+    marginLeft: 16,
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -465,26 +631,60 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  backgroundContainer: {
+    width: '100%',
+    height: 200,
+  },
+  backgroundImage: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  editBackgroundButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  profileImageContainer: {
+    position: 'absolute',
+    bottom: -40,
+    alignSelf: 'center',
+    zIndex: 10,
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+  },
+  profileInfoCard: {
+    marginTop: 50,
+    padding: 16,
+    alignItems: 'center',
+  },
   profileHeader: {
     flexDirection: 'row',
     padding: 20,
     alignItems: 'center',
   },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: '#F0F0F0',
-  },
   profileStats: {
-    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginLeft: 20,
+    justifyContent: 'center',
+    marginTop: 8,
+    marginBottom: 16,
   },
   statItem: {
     alignItems: 'center',
+    marginHorizontal: 16,
   },
   statNumber: {
     fontSize: 18,
@@ -511,13 +711,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bioSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 15,
+    marginTop: 8,
+    alignItems: 'center',
   },
   bioText: {
     fontSize: 14,
     color: '#444',
     fontFamily: 'Inter-Regular',
+    textAlign: 'center',
   },
   portfolioHeader: {
     flexDirection: 'row',
@@ -527,6 +728,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
+    marginTop: 8,
   },
   portfolioTitle: {
     fontSize: 16,

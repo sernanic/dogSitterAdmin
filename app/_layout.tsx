@@ -1,18 +1,18 @@
 import 'react-native-get-random-values';
-import { useCallback, useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { useAuthStore } from '../store/useAuthStore';
+import { Stack, router, Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { SplashScreen } from 'expo-router';
 import AuthProvider from '../components/providers/AuthProvider';
-import * as Font from 'expo-font';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete
-SplashScreen.preventAutoHideAsync().catch(() => {
-  /* ignore error */
-});
+// Don't prevent auto-hiding - let splash screen hide automatically
+// SplashScreen.preventAutoHideAsync().catch(() => {
+//   /* ignore error */
+// });
 
 declare global {
   interface Window {
@@ -21,6 +21,9 @@ declare global {
 }
 
 export default function RootLayout() {
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+
+  // Load fonts first
   const [loaded, error] = useFonts({
     'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
     'Inter-Medium': require('../assets/fonts/Inter-Medium.ttf'),
@@ -28,24 +31,40 @@ export default function RootLayout() {
     'Inter-Bold': require('../assets/fonts/Inter-Bold.ttf'),
   });
 
-  // Properly handle font loading with async/await
+  // Handle auth state changes at the root level
   useEffect(() => {
-    async function prepare() {
-      try {
-        if (error) throw error;
-        
-        // Wait for fonts to load
-        if (loaded) {
-          // Keep the splash screen visible while we fetch resources
-          await SplashScreen.hideAsync();
-          window.frameworkReady?.();
-        }
-      } catch (e) {
-        console.warn('Error during app initialization:', e);
+    if (loaded) {
+      // Only check auth state after fonts are loaded
+      if (!isAuthenticated) {
+        // Force redirect to auth when not authenticated
+        router.replace('/auth');
       }
     }
+  }, [isAuthenticated, loaded]);
 
-    prepare();
+  // Subscribe to auth store changes
+  useEffect(() => {
+    // Only set up subscription after component mounts
+    const unsubscribe = useAuthStore.subscribe((state) => {
+      if (!state.isAuthenticated) {
+        router.replace('/auth');
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Font loading effect
+  useEffect(() => {
+    if (error) {
+      console.warn('Error loading fonts:', error);
+    }
+    
+    if (loaded) {
+      window.frameworkReady?.();
+    }
   }, [loaded, error]);
 
   // Return null until everything is ready

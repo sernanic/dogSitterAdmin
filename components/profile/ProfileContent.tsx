@@ -100,9 +100,15 @@ const ProfileContent = () => {
     };
   }, [user]);
 
-  const handleLogout = useCallback(() => {
-    logout();
-    router.replace('/auth');
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+      router.replace('/auth');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Show error message to user
+      Alert.alert('Error', 'Failed to log out. Please try again.');
+    }
   }, [logout]);
 
   const handleSubmitProfileUpdate = async () => {
@@ -269,7 +275,7 @@ const ProfileContent = () => {
         } else {
           Alert.alert('Success', 'Your profile picture has been updated.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error updating profile picture:', error);
         
         // Show error message
@@ -334,6 +340,41 @@ const ProfileContent = () => {
         onSubmit={handleSubmitProfileUpdate}
         isSubmitting={isSubmitting}
         formError={formError}
+        onUploadAvatar={async (uri) => {
+          // Show toast on Android or alert on iOS for upload starting
+          if (Platform.OS === 'android') {
+            ToastAndroid.show('Uploading profile picture...', ToastAndroid.SHORT);
+          } else {
+            Alert.alert('Uploading', 'Your profile picture is being uploaded...');
+          }
+          
+          try {
+            // Upload the image and update profile with timeout handling
+            const uploadPromise = updateAvatar(uri);
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Upload timeout')), 30000)
+            );
+            
+            await Promise.race([uploadPromise, timeoutPromise]);
+            
+            // Show success message
+            if (Platform.OS === 'android') {
+              ToastAndroid.show('Profile picture updated successfully!', ToastAndroid.SHORT);
+            } else {
+              Alert.alert('Success', 'Your profile picture has been updated.');
+            }
+          } catch (error) {
+            console.error('Error updating profile picture:', error);
+            
+            // Show error message
+            if (Platform.OS === 'android') {
+              ToastAndroid.show('Failed to update profile picture', ToastAndroid.LONG);
+            } else {
+              Alert.alert('Error', 'Failed to update profile picture. Please try again.');
+            }
+            throw error; // Re-throw to let the modal handle the error state
+          }
+        }}
       />
 
       {/* Address Manager Modal */}

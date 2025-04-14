@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, DollarSign, Star, Clock, Users, MapPin, Calendar } from 'lucide-react-native';
+import { Bell, DollarSign, Star, Clock, Users, MapPin, Calendar, CircleCheck as CheckCircle, MessageSquare } from 'lucide-react-native';
 import { supabase, getSitterStats, getSitterEarnings, SitterStats, SitterEarnings } from '../../lib/supabase';
 import { format, parseISO } from 'date-fns';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
+import { initializeNotifications } from '@/services/notificationService';
 
 // Interfaces for data types
 interface Pet {
@@ -52,7 +53,13 @@ interface Booking {
   pets?: Pet[];
 }
 
-
+// Function to format currency
+const formatCurrency = (amount: number) => {
+  return amount.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  });
+};
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
@@ -62,16 +69,13 @@ export default function HomeScreen() {
     averageRating: 0,
     totalClients: 0,
   });
-  const [earningsData, setEarningsData] = useState<SitterEarnings>({
-    today: '$0.00',
-    thisWeek: '$0.00',
-    thisMonth: '$0.00',
-    totalEarnings: '$0.00',
-    paidInvoicesCount: 0,
-    pendingInvoicesCount: 0
-  });
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingEarnings, setLoadingEarnings] = useState(true);
+  const [earningsData, setEarningsData] = useState({
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+  });
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [owners, setOwners] = useState<{[key: string]: Profile}>({});
   const [pets, setPets] = useState<{[key: string]: Pet}>({});
@@ -86,48 +90,71 @@ export default function HomeScreen() {
     
     try {
       setLoadingStats(true);
+      
+      // For a new sitter, this might return default values if no stats exist yet
       const sitterStats = await getSitterStats(user.id);
       
-      // Update the stats state with real data
+      // If we're here, we have either real stats or default values
+      // The getSitterStats function already handles the "no rows" error internally
       setStats({
         totalBookings: sitterStats.total_bookings,
         completedBookings: sitterStats.completed_bookings,
-        averageRating: parseFloat(sitterStats.average_rating.toFixed(1)),
+        averageRating: parseFloat((sitterStats.average_rating || 0).toFixed(1)),
         totalClients: sitterStats.total_clients,
       });
     } catch (error) {
       console.error('Error fetching sitter stats:', error);
+      
+      // If something unexpected happens, set default values
+      setStats({
+        totalBookings: 0,
+        completedBookings: 0,
+        averageRating: 0,
+        totalClients: 0,
+      });
     } finally {
       setLoadingStats(false);
     }
   };
 
   // Fetch sitter earnings from the database
-  const fetchSitterEarnings = async () => {
-    if (!user) {
-      setLoadingEarnings(false);
-      return;
-    }
-    
+  const fetchSitterEarnings = useCallback(async () => {
+    console.log('Fetching earnings data...');
+    setLoadingEarnings(true);
     try {
-      setLoadingEarnings(true);
-      const earnings = await getSitterEarnings(user.id);
-      setEarningsData(earnings);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData?.session) {
+        console.error('Error getting session or no session:', sessionError);
+        // Handle appropriately - maybe show login or specific message
+        setEarningsData({ today: 0, thisWeek: 0, thisMonth: 0 }); // Reset to numbers
+        return; // Exit if not authenticated
+      }
+
+      const { data, error } = await supabase.functions.invoke('get-sitter-earnings');
+
+      if (error) {
+        console.error('Error fetching earnings:', error);
+        // Optionally set an error state here to show in the UI
+        setEarningsData({ today: 0, thisWeek: 0, thisMonth: 0 }); // Reset to numbers
+      } else if (data) {
+        console.log('Earnings data received:', data);
+        setEarningsData({
+          today: data.today ?? 0,          // Use number
+          thisWeek: data.thisWeek ?? 0,    // Use number
+          thisMonth: data.thisMonth ?? 0,   // Use number
+        });
+      } else {
+         console.log('No earnings data returned, but no error.');
+         setEarningsData({ today: 0, thisWeek: 0, thisMonth: 0 }); // Reset to numbers
+      }
     } catch (error) {
-      console.error('Error fetching sitter earnings:', error);
-      // Set default values on error
-      setEarningsData({
-        today: '$0.00',
-        thisWeek: '$0.00',
-        thisMonth: '$0.00',
-        totalEarnings: '$0.00',
-        paidInvoicesCount: 0,
-        pendingInvoicesCount: 0
-      });
+      console.error('Unexpected error fetching earnings:', error);
+      setEarningsData({ today: 0, thisWeek: 0, thisMonth: 0 }); // Reset to numbers
     } finally {
       setLoadingEarnings(false);
+      console.log('Finished fetching earnings data.');
     }
-  };
+  }, []);
 
   // Fetch the data when the component loads
   useEffect(() => {
@@ -141,6 +168,20 @@ export default function HomeScreen() {
       setLoadingEarnings(false);
     }
   }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    if (user) {
+      // Initialize notifications
+      initializeNotifications(user.id, 'sitter').then(token => {
+        if (token) {
+          // Token is stored in Supabase by the initializeNotifications function
+          console.log('Notification token ready:', token);
+        }
+      }).catch(err => {
+        console.error('Error initializing notifications:', err);
+      });
+    }
+  }, [user]);
 
   // Function to fetch upcoming bookings
   const fetchUpcomingBookings = async () => {
@@ -158,105 +199,107 @@ export default function HomeScreen() {
         .order('booking_date', { ascending: true })
         .limit(2);
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching bookings:', error);
+        setUpcomingBookings([]);
+        return;
+      }
       
-      if (bookingsData && bookingsData.length > 0) {
-        // Get unique owner IDs to fetch profiles
-        const ownerIds = [...new Set(bookingsData.map(booking => booking.owner_id))];
+      // New sitter might not have any bookings yet
+      if (!bookingsData || bookingsData.length === 0) {
+        setUpcomingBookings([]);
+        return;
+      }
+      
+      // Get unique owner IDs to fetch profiles
+      const ownerIds = [...new Set(bookingsData.map(booking => booking.owner_id))];
+      
+      // Fetch owner profiles
+      const { data: ownerProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', ownerIds);
         
-        // Fetch owner profiles
-        const { data: ownerProfiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', ownerIds);
-          
-        if (profilesError) throw profilesError;
-        
-        // Create a map of owner profiles
-        const ownersMap: {[key: string]: Profile} = {};
-        if (ownerProfiles) {
-          ownerProfiles.forEach(profile => {
-            ownersMap[profile.id] = profile;
-          });
-        }
-        setOwners(ownersMap);
-        
-        // Extract all pet IDs from bookings
-        const petIds: string[] = [];
-        bookingsData.forEach(booking => {
-          try {
-            // Check if it's already a valid array (might be pre-parsed by Supabase)
-            if (typeof booking.selected_pets === 'object' && Array.isArray(booking.selected_pets)) {
-              const petArray = booking.selected_pets as string[];
-              petIds.push(...petArray);
-            }
-            // Try to parse it as JSON
-            else if (typeof booking.selected_pets === 'string') {
-              // Make sure it at least looks like a JSON array before parsing
-              if (booking.selected_pets.trim().startsWith('[') && booking.selected_pets.trim().endsWith(']')) {
-                const selectedPets = JSON.parse(booking.selected_pets) as string[];
-                if (Array.isArray(selectedPets)) {
-                  petIds.push(...selectedPets);
-                }
-              } else {
-                console.log('Not a JSON array format:', booking.selected_pets);
+      if (profilesError) {
+        console.error('Error fetching owner profiles:', profilesError);
+        // Still set the bookings, but owners might show as "Loading..."
+        setUpcomingBookings(bookingsData);
+        return;
+      }
+      
+      // Create a map of owner profiles
+      const ownersMap: {[key: string]: Profile} = {};
+      if (ownerProfiles) {
+        ownerProfiles.forEach(profile => {
+          ownersMap[profile.id] = profile;
+        });
+      }
+      setOwners(ownersMap);
+      
+      // Extract all pet IDs from bookings
+      const petIds: string[] = [];
+      bookingsData.forEach(booking => {
+        try {
+          // Check if it's already a valid array (might be pre-parsed by Supabase)
+          if (typeof booking.selected_pets === 'object' && Array.isArray(booking.selected_pets)) {
+            const petArray = booking.selected_pets as string[];
+            petIds.push(...petArray);
+          }
+          // Try to parse it as JSON
+          else if (typeof booking.selected_pets === 'string') {
+            // Make sure it at least looks like a JSON array before parsing
+            if (booking.selected_pets.trim().startsWith('[') && booking.selected_pets.trim().endsWith(']')) {
+              const selectedPets = JSON.parse(booking.selected_pets) as string[];
+              if (Array.isArray(selectedPets)) {
+                petIds.push(...selectedPets);
               }
+            } else {
+              console.log('Not a JSON array format:', booking.selected_pets);
             }
-          } catch (e) {
-            console.error('Error parsing pets from booking ID ' + booking.id + ':', e);
-            console.log('Raw selected_pets value:', booking.selected_pets);
+          }
+        } catch (e) {
+          console.error('Error parsing pets from booking ID ' + booking.id + ':', e);
+          console.log('Raw selected_pets value:', booking.selected_pets);
+        }
+      });
+      
+      if (petIds.length > 0) {
+        // Fetch pet details - make sure we have unique IDs
+        const uniquePetIds = [...new Set(petIds)];
+        
+        // Fetch pet details - attempt to fetch each pet individually to maximize chances of success
+        const petsMap: {[key: string]: Pet} = {};
+        const fetchPetPromises = uniquePetIds.map(async (petId) => {
+          try {
+            const { data, error } = await supabase
+              .from('pets')
+              .select('*')
+              .eq('id', petId)
+              .single();
+              
+            if (error) {
+              console.error(`Error fetching pet ${petId}:`, error);
+            } else if (data) {
+              petsMap[petId] = data;
+            }
+          } catch (fetchErr) {
+            console.error(`Exception fetching pet ${petId}:`, fetchErr);
           }
         });
         
-        if (petIds.length > 0) {
-          // Fetch pet details - make sure we have unique IDs
-          const uniquePetIds = [...new Set(petIds)];
-          console.log('Fetching pets with IDs:', uniquePetIds);
-          
-          // Fetch pet details - attempt to fetch each pet individually to maximize chances of success
-          const petsMap: {[key: string]: Pet} = {};
-          const fetchPetPromises = uniquePetIds.map(async (petId) => {
-            try {
-              const { data, error } = await supabase
-                .from('pets')
-                .select('*')
-                .eq('id', petId)
-                .single();
-                
-              if (error) {
-                console.error(`Error fetching pet ${petId}:`, error);
-              } else if (data) {
-                console.log(`Found pet ${petId}:`, data.name);
-                petsMap[petId] = data;
-              }
-            } catch (fetchErr) {
-              console.error(`Exception fetching pet ${petId}:`, fetchErr);
-            }
-          });
-          
-          // Wait for all pet fetches to complete
-          await Promise.all(fetchPetPromises);
-          
-          // Log the results
-          if (Object.keys(petsMap).length === 0) {
-            console.warn('No pets found for IDs:', uniquePetIds);
-          } else {
-            console.log(`Found ${Object.keys(petsMap).length} pets:`, 
-              Object.values(petsMap).map(p => p.name));
-          }
-          
-          // Set the pets map
-          setPets(petsMap);
-        }
+        // Wait for all pet fetches to complete
+        await Promise.all(fetchPetPromises);
         
-        // Set the bookings data
-        setUpcomingBookings(bookingsData);
-      } else {
-        // No bookings found
-        setUpcomingBookings([]);
+        // Set the pets map
+        setPets(petsMap);
       }
+      
+      // Set the bookings data
+      setUpcomingBookings(bookingsData);
     } catch (error) {
       console.error('Error fetching upcoming bookings:', error);
+      // Set empty bookings on error
+      setUpcomingBookings([]);
     } finally {
       setLoadingBookings(false);
     }
@@ -322,7 +365,7 @@ export default function HomeScreen() {
   };
   
   // Refresh function for pull-to-refresh
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await Promise.all([
@@ -335,7 +378,7 @@ export default function HomeScreen() {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [fetchUpcomingBookings, fetchSitterStats, fetchSitterEarnings]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -347,7 +390,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Good morning,</Text>
-            <Text style={styles.name}>Jessica</Text>
+            <Text style={styles.name}>{user?.name || 'Sitter'}</Text>
           </View>
           <TouchableOpacity style={styles.notificationButton}>
             <Bell size={24} color="#333" />
@@ -366,15 +409,15 @@ export default function HomeScreen() {
             <View style={styles.earningsRow}>
               <View style={styles.earningsItem}>
                 <Text style={styles.earningsLabel}>Today</Text>
-                <Text style={styles.earningsValue}>{earningsData.today}</Text>
+                <Text style={styles.earningsValue}>{formatCurrency(earningsData.today)}</Text>
               </View>
               <View style={styles.earningsItem}>
                 <Text style={styles.earningsLabel}>This Week</Text>
-                <Text style={styles.earningsValue}>{earningsData.thisWeek}</Text>
+                <Text style={styles.earningsValue}>{formatCurrency(earningsData.thisWeek)}</Text>
               </View>
               <View style={styles.earningsItem}>
                 <Text style={styles.earningsLabel}>This Month</Text>
-                <Text style={styles.earningsValue}>{earningsData.thisMonth}</Text>
+                <Text style={styles.earningsValue}>{formatCurrency(earningsData.thisMonth)}</Text>
               </View>
             </View>
           )}
@@ -460,12 +503,17 @@ export default function HomeScreen() {
                   source={{ 
                     uri: (() => {
                       try {
-                        const petIds = JSON.parse(booking.selected_pets);
-                        if (Array.isArray(petIds) && petIds.length > 0) {
-                          return pets[petIds[0]]?.image_url || 'https://placehold.co/100x100/png';
+                        // Check if selected_pets is a string and looks like JSON before trying to parse
+                        if (typeof booking.selected_pets === 'string' && 
+                            (booking.selected_pets.startsWith('[') || booking.selected_pets.startsWith('{'))) {
+                          const petIds = JSON.parse(booking.selected_pets);
+                          if (Array.isArray(petIds) && petIds.length > 0 && pets[petIds[0]]?.image_url) {
+                            return pets[petIds[0]].image_url;
+                          }
                         }
                         return 'https://placehold.co/100x100/png';
-                      } catch {
+                      } catch (error) {
+                        console.log('Error parsing pet IDs:', error, booking.selected_pets);
                         return 'https://placehold.co/100x100/png';
                       }
                     })()
@@ -496,8 +544,6 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
-
-import { CircleCheck as CheckCircle, MessageSquare } from 'lucide-react-native';
 
 const styles = StyleSheet.create({
   loadingContainer: {

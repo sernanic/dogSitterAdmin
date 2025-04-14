@@ -8,6 +8,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/context/auth';
 import { useAuthStore } from '@/store/useAuthStore';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { setupNotificationListeners } from '@/services/notificationService';
+import * as Notifications from 'expo-notifications';
 
 type MessageThread = {
   id: string;
@@ -39,6 +41,7 @@ export default function MessagesScreen() {
   const [filteredThreads, setFilteredThreads] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [ownerProfiles, setOwnerProfiles] = useState<OwnerProfiles>({});
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   
   // Access auth state directly from store for more reliable access
   const user = useAuthStore(state => state.user);
@@ -49,6 +52,37 @@ export default function MessagesScreen() {
     if (!timestamp) return '';
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
   };
+
+  useEffect(() => {
+    // Setup notification listeners
+    let unsubscribe: (() => void) | undefined;
+    const setupListeners = async () => {
+      unsubscribe = await setupNotificationListeners(
+        (notification) => {
+          console.log('Notification received:', notification);
+          // You could update the UI or trigger a refresh when a notification is received
+          if (notification.request.content.data?.type === 'message') {
+            // Refresh message threads
+            if (isAuthenticated && user) {
+              fetchMessageThreads();
+            }
+          }
+        },
+        (response) => {
+          console.log('Notification response:', response);
+          // Navigate to the appropriate conversation if tapped
+          if (response.notification.request.content.data?.threadId) {
+            router.push(`/conversation/${response.notification.request.content.data.threadId}`);
+          }
+        }
+      );
+    };
+    setupListeners();
+    
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     // If not authenticated, stop loading and return early
@@ -65,65 +99,7 @@ export default function MessagesScreen() {
     }
 
     console.log('Fetching message threads for user:', user.id);
-
-    // Fetch message threads for the current sitter
-    const fetchMessageThreads = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('message_threads')
-          .select('*, walking_bookings(selected_pets)')
-          .eq('sitter_id', user.id)
-          .order('last_message_time', { ascending: false });
-
-        if (error) throw error;
-
-        // Handle case when data is null
-        if (!data || data.length === 0) {
-          console.log('No message threads found');
-          setMessageThreads([]);
-          setFilteredThreads([]);
-          setLoading(false);
-          return;
-        }
-
-        // Fetch owner information
-        const ownerIds = [...new Set(data.map(thread => thread.owner_id))];
-        
-        if (ownerIds.length === 0) {
-          console.log('No owner IDs found in threads');
-          setMessageThreads(data);
-          setFilteredThreads(data);
-          setLoading(false);
-          return;
-        }
-
-        const { data: owners, error: ownersError } = await supabase
-          .from('profiles')
-          .select('id, name, avatar_url')
-          .in('id', ownerIds);
-
-        if (ownersError) throw ownersError;
-
-        // Create a map of owner IDs to owner data
-        const ownersMap: OwnerProfiles = {};
-        if (owners) {
-          owners.forEach(owner => {
-            ownersMap[owner.id] = owner;
-          });
-        }
-
-        setOwnerProfiles(ownersMap);
-        setMessageThreads(data);
-        setFilteredThreads(data);
-      } catch (error) {
-        console.error('Error fetching message threads:', error instanceof Error ? error.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchMessageThreads();
-
     // Subscribe to real-time updates for message threads
     const subscription = supabase
       .channel('message_threads_changes')
@@ -146,6 +122,63 @@ export default function MessagesScreen() {
       }
     };
   }, [user, isAuthenticated]);
+
+  const fetchMessageThreads = async () => {
+    try {
+      setLoading(true);
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('message_threads')
+        .select('*, walking_bookings(selected_pets)')
+        .eq('sitter_id', user.id)
+        .order('last_message_time', { ascending: false });
+
+      if (error) throw error;
+
+      // Handle case when data is null
+      if (!data || data.length === 0) {
+        console.log('No message threads found');
+        setMessageThreads([]);
+        setFilteredThreads([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch owner information
+      const ownerIds = [...new Set(data.map(thread => thread.owner_id))];
+      
+      if (ownerIds.length === 0) {
+        console.log('No owner IDs found in threads');
+        setMessageThreads(data);
+        setFilteredThreads(data);
+        setLoading(false);
+        return;
+      }
+
+      const { data: owners, error: ownersError } = await supabase
+        .from('profiles')
+        .select('id, name, avatar_url')
+        .in('id', ownerIds);
+
+      if (ownersError) throw ownersError;
+
+      // Create a map of owner IDs to owner data
+      const ownersMap: OwnerProfiles = {};
+      if (owners) {
+        owners.forEach(owner => {
+          ownersMap[owner.id] = owner;
+        });
+      }
+
+      setOwnerProfiles(ownersMap);
+      setMessageThreads(data);
+      setFilteredThreads(data);
+    } catch (error) {
+      console.error('Error fetching message threads:', error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRealtimeUpdate = (payload: RealtimePostgresChangesPayload<MessageThread>) => {
     // Handle different types of changes
@@ -186,7 +219,7 @@ export default function MessagesScreen() {
     }
   };
 
-  const handleSearch = (text) => {
+  const handleSearch = (text: string) => {
     setSearchQuery(text);
     if (text) {
       const filtered = messageThreads.filter(thread => {
@@ -201,10 +234,7 @@ export default function MessagesScreen() {
   };
 
   const navigateToConversation = (thread: MessageThread) => {
-    router.push({
-      pathname: '/conversation/[id]',
-      params: { id: thread.id }
-    });
+    router.push(`/conversation/${thread.id}`);
   };
 
   const renderConversationItem = ({ item }: { item: MessageThread }) => {
@@ -245,7 +275,7 @@ export default function MessagesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Messages</Text>
       </View>
@@ -257,6 +287,7 @@ export default function MessagesScreen() {
           placeholder="Search conversations"
           value={searchQuery}
           onChangeText={handleSearch}
+          clearButtonMode="while-editing"
         />
       </View>
       

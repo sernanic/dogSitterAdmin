@@ -51,8 +51,20 @@ export const getSitterStats = async (sitterId: string): Promise<SitterStats> => 
     .single();
     
   if (error) {
+    // PGRST116 is the "no rows" error code - this is normal for new sitters
+    if (isNoRowsError(error)) {
+      // For new sitters, return default values without logging an error
+      return {
+        total_bookings: 0,
+        completed_bookings: 0,
+        average_rating: 0,
+        total_clients: 0,
+        last_updated_at: new Date().toISOString()
+      };
+    }
+    // Only log unexpected errors
     console.error('Error fetching sitter stats:', error);
-    // Return default values if no stats found
+    // Return default values for any error
     return {
       total_bookings: 0,
       completed_bookings: 0,
@@ -79,6 +91,7 @@ export interface Profile {
   name: string;
   role: 'sitter';
   avatar_url?: string;
+  background_url?: string;
   bio?: string;
   location?: string;
   phoneNumber?: string;
@@ -251,6 +264,101 @@ export const updateAvatarUrl = async (userId: string, avatarUrl: string): Promis
     return data as Profile;
   } catch (error) {
     console.error('Error updating avatar URL:', error);
+    throw error;
+  }
+};
+
+// Helper function to upload background image to storage
+export const uploadProfileBackground = async (userId: string, uri: string): Promise<string> => {
+  try {
+    console.log('Starting background image upload process for URI:', uri);
+
+    // Step 1: Compress the image (optional but recommended)
+    console.log('Compressing image...');
+    const compressedImage = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1200 } }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    
+    console.log(`Compressed image URI: ${compressedImage.uri}`);
+    
+    // Step 2: Create a unique file path
+    const fileName = `bg-${userId}-${Date.now()}.jpg`;
+    const filePath = `backgrounds/${fileName}`;
+    
+    // Step 3: Read the file as base64 data
+    const fileBase64 = await FileSystem.readAsStringAsync(compressedImage.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    console.log(`File read as base64, length: ${fileBase64.length}`);
+    
+    // Step 4: Convert the base64 string to an ArrayBuffer
+    const fileArrayBuffer = decode.decode(fileBase64);
+    console.log(`File converted to ArrayBuffer, byte length: ${fileArrayBuffer.byteLength}`);
+    
+    // Step 5: Upload to Supabase Storage
+    console.log('Uploading to Supabase storage...');
+    console.log(`File path: ${filePath}`);
+    console.log(`ArrayBuffer length: ${fileArrayBuffer.byteLength}`);
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('avatars') // Reusing the same bucket for now - could create a dedicated one
+        .upload(filePath, fileArrayBuffer, {
+          contentType: 'image/jpeg',
+          cacheControl: '3600',
+          upsert: true,
+        });
+      
+      if (error) {
+        console.error('Supabase storage upload error:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+      
+      if (!data || !data.path) {
+        throw new Error('Upload succeeded but path is missing');
+      }
+      
+      console.log('Upload succeeded. Data:', JSON.stringify(data, null, 2));
+      
+      // Step 6: Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(data.path);
+      
+      if (!urlData || !urlData.publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
+      
+      console.log('Got public URL:', urlData.publicUrl);
+      console.log('Background image upload completed successfully');
+      return urlData.publicUrl;
+    } catch (uploadError) {
+      console.error('Caught error during upload step:', uploadError);
+      throw uploadError;
+    }
+  } catch (error) {
+    console.error('Error uploading background image:', error);
+    throw error;
+  }
+};
+
+// Helper function to update background URL in profile
+export const updateBackgroundUrl = async (userId: string, backgroundUrl: string): Promise<Profile> => {
+  try {
+    // Update the profile with the new background URL
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ background_url: backgroundUrl, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as Profile;
+  } catch (error) {
+    console.error('Error updating background URL:', error);
     throw error;
   }
 };
@@ -550,6 +658,19 @@ export const getSitterEarnings = async (sitterId: string): Promise<SitterEarning
       .single();
     
     if (error) {
+      // PGRST116 is the "no rows" error code - this is normal for new sitters
+      if (isNoRowsError(error)) {
+        // For new sitters, return default values without logging an error
+        return {
+          today: '$0.00',
+          thisWeek: '$0.00',
+          thisMonth: '$0.00',
+          totalEarnings: '$0.00',
+          paidInvoicesCount: 0,
+          pendingInvoicesCount: 0
+        };
+      }
+      
       console.error('Error fetching sitter earnings from summary view:', error);
       
       // Fallback: Call the function directly
@@ -640,6 +761,11 @@ export const getSitterInfo = async (sitterId: string): Promise<SitterInfo | null
       .single();
     
     if (error) {
+      // PGRST116 is the "no rows" error code - this is normal for new sitters
+      if (isNoRowsError(error)) {
+        // For new sitters, it's normal to not have info yet
+        return null;
+      }
       console.error('Error fetching sitter info:', error);
       return null;
     }
@@ -862,4 +988,9 @@ export const deletePortfolioImage = async (imageId: string, imageUrl: string): P
     console.error('Error deleting portfolio image:', error);
     throw error;
   }
+};
+
+// Helper utility to check if an error is a "no rows" error
+export const isNoRowsError = (error: any): boolean => {
+  return error && error.code === 'PGRST116';
 };

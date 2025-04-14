@@ -38,41 +38,46 @@ export default function Register() {
       setIsLoading(true);
       setError(null);
       
-      // Register the user with explicit sitter role
+      // Register the user - this has been simplified to work with Supabase's RLS
       await register(name, email, password);
       
       // Get the current auth state
       const isAuthenticated = useAuthStore.getState().isAuthenticated;
-      const user = useAuthStore.getState().user;
       
-      setIsLoading(false);
-      
-      if (!isAuthenticated || !user) {
+      if (isAuthenticated) {
+        // Successfully registered and authenticated
+        console.log('User registered and automatically signed in, redirecting to tabs');
+        router.replace('/(tabs)');
+      } else {
         // Email confirmation required
+        console.log('Email confirmation required, redirecting to login screen');
         alert(
           'Registration successful! Please check your email to confirm your account before logging in.'
         );
-        router.replace('/login');
-      } else if (user.role !== 'sitter') {
-        // Something went wrong with role assignment
-        setError('Failed to set up sitter account properly. Please try again or contact support.');
-        // Logout to clean up the state
-        await useAuthStore.getState().logout();
-      } else {
-        // Successfully registered and authenticated as sitter
-        router.replace('/(tabs)');
+        router.replace('/auth');
       }
     } catch (error: any) {
-      setIsLoading(false);
+      console.error('Registration error details:', error);
+      
       // Provide more specific error messages based on the error type
-      if (error.message?.includes('sitter')) {
-        setError('Failed to set up sitter account. Please try again.');
-      } else if (error.message?.includes('email')) {
-        setError('This email is already registered. Please use a different email.');
+      if (typeof error === 'object' && error !== null) {
+        // Supabase errors often have a code or message property
+        const errorMessage = error.message || error.error_description || JSON.stringify(error);
+        
+        if (errorMessage.includes('already registered')) {
+          setError('This email is already registered. Please use a different email or try logging in.');
+        } else if (errorMessage.includes('42501') || errorMessage.includes('Row Level Security')) {
+          setError('Registration failed due to permission issues. Please try again later.');
+        } else if (errorMessage.includes('timeout')) {
+          setError('Registration timed out. Please try again.');
+        } else {
+          setError(`Registration failed: ${errorMessage}`);
+        }
       } else {
-        setError(error?.message || 'Registration failed. Please try again.');
+        setError('Registration failed. Please try again.');
       }
-      console.error('Registration error:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 

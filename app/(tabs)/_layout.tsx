@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router';
+import AuthGuard from '../../components/auth/AuthGuard';
 import { Chrome as Home, Calendar, MessageSquare, User } from 'lucide-react-native';
 import { Platform } from 'react-native';
 
 export default function TabLayout() {
   return (
+    <AuthGuard>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#62C6B9',
@@ -71,5 +73,6 @@ export default function TabLayout() {
       />
 
     </Tabs>
+    </AuthGuard>
   );
 }

@@ -11,6 +11,7 @@ export interface User {
   email: string;
   role: UserRole;
   avatar_url?: string;
+  background_url?: string;
   phoneNumber?: string;
   location?: string;
 }
@@ -20,6 +21,7 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isUploading: boolean;
+  isInitialized: boolean;
   
   // Actions
   login: (email: string, password: string) => Promise<void>;
@@ -39,6 +41,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isUploading: false,
+      isInitialized: false,
       
       login: async (email: string, password: string) => {
         try {
@@ -48,7 +51,11 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
           
-          if (error) throw error;
+          if (error) {
+            // For debugging purposes, but user will only see friendly message
+            console.log('Login error from Supabase:', error);
+            throw new Error('Invalid login credentials');
+          }
           
           if (!data || !data.user) {
             throw new Error('Login successful but no user data returned');
@@ -63,11 +70,18 @@ export const useAuthStore = create<AuthState>()(
             .single();
             
           if (profileError) {
-            console.error('Error fetching profile:', profileError);
+            console.log('Error fetching profile:', profileError);
             throw profileError;
           }
           
-          console.log('Profile data retrieved:', JSON.stringify(profile, null, 2));
+          // Ensure profile has sitter role, update if needed
+          if (profile.role !== 'sitter') {
+            console.warn('Profile role is not sitter, updating to sitter');
+            await supabase
+              .from('profiles')
+              .update({ role: 'sitter' })
+              .eq('id', data.user.id);
+          }
           
           // Set authenticated state with complete user data
           set({
@@ -78,13 +92,15 @@ export const useAuthStore = create<AuthState>()(
               email: data.user.email || '',
               role: 'sitter', // Always enforce sitter role
               avatar_url: profile.avatar_url || '',
+              background_url: profile.background_url || '',
               phoneNumber: profile.phoneNumber || '',
-              location: profile.location || '',
+              // Handle location field even if not in DB
+              location: '',
             },
             token: data.session?.access_token || null,
           });
         } catch (error) {
-          console.error('Login failed:', error);
+          console.log('Login failed:', error);
           throw error;
         }
       },
@@ -125,7 +141,7 @@ export const useAuthStore = create<AuthState>()(
             options: {
               data: {
                 name,
-                role: 'sitter',
+                role: 'sitter', // Always set to sitter in auth metadata
               },
             },
           });
@@ -133,60 +149,80 @@ export const useAuthStore = create<AuthState>()(
           if (error) throw error;
           
           if (data.user) {
-            // Immediately update the profile to ensure it's a sitter
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({
-                role: 'sitter',
-                name,
-                email: data.user.email,
-                phoneNumber: '',
-                location: '',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', data.user.id);
-
-            if (updateError) {
-              console.error('Error updating profile:', updateError);
-              throw new Error('Failed to set up sitter account');
-            }
-
-            // Add a small delay to ensure database consistency
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Verify the profile was updated correctly
-            const { data: profile, error: verifyError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', data.user.id)
-              .single();
-
-            if (verifyError) {
-              console.error('Error verifying profile:', verifyError);
-              throw new Error('Failed to verify sitter account');
-            }
-
-            if (profile.role !== 'sitter') {
-              throw new Error('Failed to set up sitter account properly');
-            }
-
+            // In Supabase, there's usually a database trigger that creates the profile
+            // We need to wait for auto-confirmation (or manual confirmation)
+            // before we can modify the profile
+            
             // Check if we have a session (auto-confirm is enabled)
             if (data.session) {
               console.log('User registered and automatically signed in');
               
-              set({
-                isAuthenticated: true,
-                user: {
-                  id: data.user.id,
-                  name,
-                  email: data.user.email || '',
-                  role: 'sitter',
-                  avatar_url: profile.avatar_url || '',
-                  phoneNumber: profile.phoneNumber || '',
-                  location: profile.location || '',
-                },
-                token: data.session.access_token,
-              });
+              try {
+                // Fetch the auto-created profile
+                const { data: profile, error: profileError } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', data.user.id)
+                  .single();
+                
+                if (profileError) {
+                  console.warn('Could not fetch profile after registration:', profileError);
+                  // We don't throw here to allow login to proceed
+                }
+                
+                // If the profile exists and has wrong role, try to update it
+                if (profile && profile.role !== 'sitter') {
+                  console.log('Updating profile role to sitter');
+                  
+                  // The auth session has the RLS permissions to update the user's own profile
+                  const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ 
+                      role: 'sitter',
+                      name: name || profile.name,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', data.user.id);
+                    
+                  if (updateError) {
+                    console.warn('Could not update profile role:', updateError);
+                    // Continue anyway - we'll set the role in the local state
+                  }
+                }
+                
+                // Set authenticated state
+                set({
+                  isAuthenticated: true,
+                  user: {
+                    id: data.user.id,
+                    name: name,
+                    email: data.user.email || '',
+                    role: 'sitter', // Always set to sitter in state
+                    avatar_url: profile?.avatar_url || '',
+                    background_url: profile?.background_url || '',
+                    phoneNumber: profile?.phoneNumber || '',
+                    location: '',
+                  },
+                  token: data.session.access_token,
+                });
+              } catch (profileError) {
+                console.error('Error accessing profile after sign-up:', profileError);
+                // Still set the state with what we know
+                set({
+                  isAuthenticated: true,
+                  user: {
+                    id: data.user.id,
+                    name: name,
+                    email: data.user.email || '',
+                    role: 'sitter',
+                    avatar_url: '',
+                    background_url: '',
+                    phoneNumber: '',
+                    location: '',
+                  },
+                  token: data.session.access_token,
+                });
+              }
             } else {
               // Email confirmation is required, user isn't authenticated yet
               console.log('Registration successful, email confirmation required');
@@ -208,13 +244,25 @@ export const useAuthStore = create<AuthState>()(
           const { error } = await supabase.auth.signOut();
           if (error) throw error;
           
+          // Clear all state immediately
           set({
             isAuthenticated: false,
             user: null,
             token: null,
+            isUploading: false,
           });
+
+          // Force clear persisted state
+          await AsyncStorage.removeItem('auth-storage');
         } catch (error) {
           console.error('Logout failed:', error);
+          // Still clear state even if Supabase logout fails
+          set({
+            isAuthenticated: false,
+            user: null,
+            token: null,
+            isUploading: false,
+          });
           throw error;
         }
       },
@@ -229,20 +277,32 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
           
-          // Updates the profile in the database
-          await supabase.from('profiles').update({
+          // Updates the profile in the database - only include fields that exist in the schema
+          const { error } = await supabase.from('profiles').update({
             name: userData.name,
-            role: userData.role,
+            role: 'sitter', // Always ensure role is sitter
             avatar_url: userData.avatar_url,
+            background_url: userData.background_url,
             phoneNumber: userData.phoneNumber,
-            location: userData.location,
+            // Do not include location field as it's not in database schema
           }).eq('id', currentState.user.id);
+          
+          if (error) {
+            console.error('Error updating profile:', error);
+            if (error.code === '42501') {
+              // This is a RLS policy violation
+              console.warn('RLS policy prevented profile update. You may need to reauthenticate.');
+              throw new Error('Permission denied. Please log out and log back in.');
+            }
+            throw error;
+          }
           
           // Update the store with new user data
           set({
             user: {
               ...currentState.user,
-              ...userData
+              ...userData,
+              role: 'sitter', // Always enforce sitter role in state
             }
           });
         } catch (error) {
@@ -296,57 +356,40 @@ export const useAuthStore = create<AuthState>()(
       },
       
       refreshSession: async () => {
+        const currentState = get();
+        // Optional: If already initialized and authenticated, maybe skip full refresh?
+        // This depends on desired behavior.
+        // if (currentState.isInitialized && currentState.isAuthenticated) {
+        //   return;
+        // }
+        
+        console.log('Attempting to refresh session...');
         try {
-          const currentState = get();
-          
-          // Check current session
           const { data, error } = await supabase.auth.getSession();
-          
+          console.log('getSession response:', { data: !!data, error });
+
           if (error) {
-            throw error;
+            console.error('Error getting session:', error);
+            // Even on error, mark as initialized but not authenticated
+            set({ isAuthenticated: false, user: null, token: null });
+            throw error; // Propagate error if needed elsewhere
           }
-          
+
           if (data.session) {
-            const { user } = data.session;
-            
-            // Only update if new session differs from current state
-            if (!currentState.isAuthenticated || currentState.user?.id !== user.id) {
+            console.log('Session found, user ID:', data.session.user.id);
+            const user = data.session.user;
+            // Fetch profile ONLY if session exists and user is not already set or differs
+            if (!currentState.user || currentState.user.id !== user.id) {
               try {
-                // Get profile data - explicitly request all fields including avatar_url
-                console.log('Fetching profile data for user:', user.id);
                 const { data: profile, error: profileError } = await supabase
                   .from('profiles')
-                  .select('*') // Select all fields
+                  .select('*')
                   .eq('id', user.id)
                   .single();
-                
-                if (profileError) {
-                  throw profileError;
-                }
-                
-                console.log('Profile data retrieved:', JSON.stringify(profile, null, 2));
-                
-                // Set state with complete profile data
-                set({
-                  isAuthenticated: true,
-                  user: {
-                    id: user.id,
-                    name: profile.name,
-                    email: user.email || '',
-                    role: profile.role || 'sitter',
-                    avatar_url: profile.avatar_url || '',
-                    phoneNumber: profile.phoneNumber || '',
-                    location: profile.location || '',
-                  },
-                  token: data.session.access_token,
-                });
-              } catch (profileError) {
-                // Profile might not exist yet if user just signed up with OAuth
-                console.warn('Profile fetch failed:', profileError);
-                
-                // Only set new state if it's different from current state
-                if (!currentState.isAuthenticated || currentState.user?.id !== user.id) {
-                  // Set minimal user data
+
+                if (profileError || !profile) {
+                  console.warn('Profile fetch failed during refresh:', profileError?.message);
+                  // If profile fetch fails, still set basic auth state from session
                   set({
                     isAuthenticated: true,
                     user: {
@@ -354,34 +397,74 @@ export const useAuthStore = create<AuthState>()(
                       name: user.user_metadata?.name || user.user_metadata?.full_name || '',
                       email: user.email || '',
                       role: 'sitter', // Default role
-                      avatar_url: '', // Remove reference to non-existent profile
+                      avatar_url: user.user_metadata?.avatar_url || '',
+                      background_url: '',
                       phoneNumber: '',
                       location: '',
                     },
                     token: data.session.access_token,
                   });
+                } else {
+                  // Set state with profile data
+                  set({
+                    isAuthenticated: true,
+                    user: {
+                      id: user.id,
+                      name: profile.name,
+                      email: user.email || '',
+                      role: 'sitter', // Always enforce sitter role
+                      avatar_url: profile.avatar_url || '',
+                      background_url: profile.background_url || '',
+                      phoneNumber: profile.phoneNumber || '',
+                      location: profile.location || '',
+                    },
+                    token: data.session.access_token,
+                  });
                 }
+              } catch (profileFetchError) {
+                 console.error('Unexpected error fetching profile during refresh:', profileFetchError);
+                 // Fallback: Set basic auth state even if profile fetch crashes
+                  set({
+                    isAuthenticated: true,
+                    user: {
+                      id: user.id,
+                      name: user.user_metadata?.name || user.user_metadata?.full_name || '',
+                      email: user.email || '',
+                      role: 'sitter', // Default role
+                      avatar_url: user.user_metadata?.avatar_url || '',
+                      background_url: '',
+                      phoneNumber: '',
+                      location: '',
+                    },
+                    token: data.session.access_token,
+                  });
               }
+            } else {
+              // User is already set and matches session, just update token potentially
+              set({ token: data.session.access_token });
             }
           } else if (currentState.isAuthenticated) {
-            // Only update if current state is authenticated but there's no session
+            // No session, but store thinks user is logged in - clear state
+            console.log('No session found, clearing authenticated state.');
             set({
               isAuthenticated: false,
               user: null,
               token: null,
             });
+          } else {
+            // No session, and store already shows logged out - state is consistent
+            console.log('No session found, state already reflects logged out.');
           }
         } catch (error) {
           console.error('Session refresh failed:', error);
           // Only clear auth state on error if currently authenticated
-          const currentState = get();
-          if (currentState.isAuthenticated) {
-            set({
-              isAuthenticated: false,
-              user: null,
-              token: null,
-            });
-          }
+          // (getSession error was already handled above)
+          // set({ isAuthenticated: false, user: null, token: null });
+          // Re-throw? Or just log?
+          // throw error;
+        } finally {
+           console.log('Session refresh process complete. Marking as initialized.');
+           set({ isInitialized: true }); // <-- Mark as initialized
         }
       },
     }),

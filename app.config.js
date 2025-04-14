@@ -16,6 +16,7 @@ export default {
   ],
   ios: {
     supportsTablet: true,
+    bundleIdentifier: "com.nicolasserna.pikpup",
     infoPlist: {
       NSPhotoLibraryUsageDescription: "Allow pikpup to access your photos to update your profile picture",
       NSCameraUsageDescription: "Allow pikpup to access your camera to take profile pictures"
@@ -49,7 +50,7 @@ export default {
   // Environment variables and other extras
   extra: {
     eas: {
-      projectId: "your-eas-project-id"
+      projectId: "bed81605-7359-4e68-8786-b04d457fc427"
     },
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY,

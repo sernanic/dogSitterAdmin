@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -43,10 +43,13 @@ export default function ConversationScreen() {
   const [thread, setThread] = useState<MessageThread | null>(null);
   const [owner, setOwner] = useState<Profile | null>(null);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // Access auth state directly from store for more reliable access
   const user = useAuthStore(state => state.user);
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const flatListRef = useRef<FlatList>(null);
+  // Add this to detect keyboard status
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   // Format date in relative format (today, yesterday, date)
   const formatMessageDate = (timestamp: string) => {
@@ -140,20 +143,20 @@ export default function ConversationScreen() {
           filter: `thread_id=eq.${id}`
         }, 
         (payload: RealtimePostgresChangesPayload<Message>) => {
-          if (payload.new) {
+          const payloadMessage = payload.new as Message;
+          if (payloadMessage) {
             // Don't add our own messages
-            if (payload.new.sender_id !== user.id) {
-              setMessages(prev => [...prev, payload.new as Message]);
+            if (payloadMessage.sender_id !== user.id) {
+              setMessages(prev => [...prev, payloadMessage]);
               
               // Mark as read
-              supabase
+              void supabase
                 .from('messages')
                 .update({ is_read: true })
-                .eq('id', payload.new.id)
+                .eq('id', payloadMessage.id)
                 .then(() => {
                   console.log('Message marked as read');
-                })
-                .catch(err => {
+                }, (err: Error) => {
                   console.error('Error marking message as read:', 
                     err instanceof Error ? err.message : 'Unknown error');
                 });
@@ -163,50 +166,80 @@ export default function ConversationScreen() {
       )
       .subscribe();
 
+    // Add keyboard listeners
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+        // Scroll to bottom when keyboard appears
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+      }
+    );
+
+    // Clean up listeners
     return () => {
       subscription.unsubscribe();
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
     };
   }, [id, user, isAuthenticated]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !user || !thread) return;
-    
+    if (!newMessage.trim() || sending || !thread || !user) return;
     setSending(true);
+
     try {
-      // Send the message
-      const { data, error } = await supabase
+      // Insert new message
+      const { data: messageData, error: messageError } = await supabase
         .from('messages')
         .insert({
-          thread_id: id,
+          thread_id: thread.id,
           sender_id: user.id,
           content: newMessage.trim(),
-          is_read: false
+          is_read: false,
         })
         .select()
         .single();
 
-      if (error) throw error;
-      if (!data) throw new Error('Failed to create message');
+      if (messageError) throw messageError;
 
-      // Add to local state
-      setMessages(prev => [...prev, data as Message]);
-      setNewMessage('');
-
-      // Update the thread's last message
-      await supabase
+      // Update thread with last message info
+      const { error: threadError } = await supabase
         .from('message_threads')
         .update({
           last_message: newMessage.trim(),
-          last_message_time: new Date().toISOString()
+          last_message_time: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq('id', thread.id);
 
-      // Scroll to bottom
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      if (threadError) throw threadError;
+
+      // Add the new message to the list
+      if (messageData) {
+        setMessages(prev => [...prev, messageData]);
+        setNewMessage('');
+        // Scroll to the bottom on new message
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+
+      // Here you would trigger a notification to the recipient on the user app
+      // This is a placeholder - in a real app, this would be handled by your backend
+      console.log('Sending notification to recipient on user app with project ID: ed6daab7-82d1-4660-aa08-8ab0f87dd6fa');
+      console.log('Recipient ID:', thread.owner_id);
     } catch (error) {
-      console.error('Error sending message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error sending message:', error);
+      setError('Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
@@ -290,58 +323,62 @@ export default function ConversationScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ArrowLeft size={24} color="#333" />
-        </TouchableOpacity>
-        
-        <View style={styles.ownerInfo}>
-          {owner?.avatar_url ? (
-            <Image 
-              source={{ uri: owner.avatar_url }} 
-              style={styles.ownerAvatar} 
-            />
-          ) : (
-            <View style={styles.placeholderAvatar}>
-              <Text style={styles.avatarInitial}>
-                {owner?.name?.charAt(0) || '?'}
-              </Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={24} color="#333" />
+          </TouchableOpacity>
+          
+          <View style={styles.ownerInfo}>
+            {owner?.avatar_url ? (
+              <Image 
+                source={{ uri: owner.avatar_url }} 
+                style={styles.ownerAvatar} 
+              />
+            ) : (
+              <View style={styles.placeholderAvatar}>
+                <Text style={styles.avatarInitial}>
+                  {owner?.name?.charAt(0) || '?'}
+                </Text>
+              </View>
+            )}
+            <View>
+              <Text style={styles.ownerName}>{owner?.name || 'Unknown'}</Text>
+              <Text style={styles.ownerRole}>Owner</Text>
             </View>
-          )}
-          <View>
-            <Text style={styles.ownerName}>{owner?.name || 'Unknown'}</Text>
-            <Text style={styles.ownerRole}>Owner</Text>
           </View>
         </View>
-      </View>
-      
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.messagesList}
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => {
-          flatListRef.current?.scrollToEnd({ animated: false });
-        }}
-        onLayout={() => {
-          flatListRef.current?.scrollToEnd({ animated: false });
-        }}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              No messages yet. Start the conversation!
-            </Text>
-          </View>
-        }
-      />
-      
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={80}
-      >
+        
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={item => item.id}
+          contentContainerStyle={[
+            styles.messagesList, 
+            keyboardVisible && styles.messagesListWithKeyboard
+          ]}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => {
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }}
+          onLayout={() => {
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                No messages yet. Start the conversation!
+              </Text>
+            </View>
+          }
+        />
+        
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -358,12 +395,12 @@ export default function ConversationScreen() {
             {sending ? (
               <ActivityIndicator size="small" color="#FFF" />
             ) : (
-              <Send size={20} color="#FFF" />
+              <Send size={22} color="#FFF" />
             )}
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -430,7 +467,12 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   messagesList: {
+    flexGrow: 1,
     padding: 15,
+    paddingBottom: 10,
+  },
+  messagesListWithKeyboard: {
+    paddingBottom: 20, // Extra padding when keyboard is visible
   },
   messageContainer: {
     marginBottom: 15,
@@ -486,7 +528,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#E5E5E5',
     backgroundColor: '#FFF',
@@ -495,19 +537,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F0F0F0',
     borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     fontSize: 16,
-    maxHeight: 120,
+    minHeight: 50,
+    maxHeight: 100,
   },
   sendButton: {
     backgroundColor: '#62C6B9',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
+    marginLeft: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
   disabledSendButton: {
     backgroundColor: '#A8D4CF',

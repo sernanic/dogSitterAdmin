@@ -8,15 +8,20 @@ import {
   TouchableWithoutFeedback, 
   ScrollView, 
   StyleSheet, 
-  ActivityIndicator 
+  ActivityIndicator,
+  Image,
+  Alert,
+  Platform 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 interface EditProfileFormData {
   name: string;
   email: string;
   phoneNumber: string;
   location: string;
+  avatar_url?: string;
 }
 
 interface EditProfileModalProps {
@@ -27,6 +32,7 @@ interface EditProfileModalProps {
   onSubmit: () => Promise<void>;
   isSubmitting: boolean;
   formError: string | null;
+  onUploadAvatar: (uri: string) => Promise<void>;
 }
 
 const EditProfileModal = ({
@@ -36,8 +42,80 @@ const EditProfileModal = ({
   onFormChange,
   onSubmit,
   isSubmitting,
-  formError
+  formError,
+  onUploadAvatar
 }: EditProfileModalProps) => {
+  
+  const handleAvatarPress = async () => {
+    Alert.alert(
+      "Change Profile Picture",
+      "Choose a source",
+      [
+        {
+          text: "Take a Photo",
+          onPress: launchCamera,
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: launchImageLibrary,
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]
+    );
+  };
+
+  const launchCamera = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Required", "You need to allow camera access to change your profile picture.");
+        return;
+      }
+      
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        onUploadAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error launching camera:', error);
+      Alert.alert('Error', 'Could not open camera');
+    }
+  };
+
+  const launchImageLibrary = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Required", "You need to allow gallery access to change your profile picture.");
+        return;
+      }
+      
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        onUploadAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error launching image library:', error);
+      Alert.alert('Error', 'Could not open gallery');
+    }
+  };
   return (
     <Modal
       animationType="slide"
@@ -63,6 +141,23 @@ const EditProfileModal = ({
               )}
               
               <ScrollView style={styles.formContainer}>
+                <View style={styles.avatarContainer}>
+                  <TouchableOpacity onPress={handleAvatarPress}>
+                    {formData.avatar_url ? (
+                      <Image
+                        source={{ uri: formData.avatar_url }}
+                        style={styles.avatar}
+                      />
+                    ) : (
+                      <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                        <Ionicons name="person" size={40} color="#999" />
+                      </View>
+                    )}
+                    <View style={styles.editAvatarButton}>
+                      <Ionicons name="camera" size={16} color="#fff" />
+                    </View>
+                  </TouchableOpacity>
+                </View>
                 <View style={styles.formField}>
                   <Text style={styles.fieldLabel}>Name</Text>
                   <TextInput
@@ -124,6 +219,33 @@ const EditProfileModal = ({
 };
 
 const styles = StyleSheet.create({
+  avatarContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  avatarPlaceholder: {
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#2563EB',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

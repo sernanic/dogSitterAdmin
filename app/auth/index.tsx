@@ -31,8 +31,12 @@ export default function Login() {
       // Redirect to tabs on successful login
       router.replace('/(tabs)');
     } catch (error: any) {
-      setError(error?.message || 'Login failed. Please check your credentials.');
-      console.error(error);
+      // Only show user-friendly message in UI
+      setError('Invalid login credentials.');
+      // In development, we can still log the error for debugging
+      if (__DEV__) {
+        console.log('Login error:', error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -49,8 +53,12 @@ export default function Login() {
       // Note: For OAuth, the redirect will be handled by Supabase
       // We don't need to navigate manually here
     } catch (error: any) {
-      setError(error?.message || `${provider} login failed. Please try again.`);
-      console.error(error);
+      // Show a user-friendly error message
+      setError(`${provider} login failed. Please try again.`);
+      // Only log detailed errors in development
+      if (__DEV__) {
+        console.log(`${provider} login error:`, error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -64,15 +72,13 @@ export default function Login() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.logoContainer}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=200&auto=format&fit=crop' }}
+            source={require('../../assets/images/IMG_3648.jpg')}
             style={styles.logo}
           />
-          <Text style={styles.appName}>pikpup</Text>
-          <Text style={styles.tagline}>Connect with dog owners and grow your pet sitting business</Text>
         </View>
 
         <View style={styles.formContainer}>
-          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.title}>Sign In</Text>
           
           {error && <Text style={styles.errorText}>{error}</Text>}
           
@@ -139,7 +145,7 @@ export default function Login() {
             <View style={styles.divider} />
           </View>
           
-          <View style={styles.socialButtonsContainer}>
+          {/* <View style={styles.socialButtonsContainer}>
             <TouchableOpacity 
               style={styles.socialButton}
               onPress={() => handleSocialLogin('google')}
@@ -172,7 +178,7 @@ export default function Login() {
                 style={[styles.socialIcon, styles.appleLogo]}
               />
             </TouchableOpacity>
-          </View>
+          </View> */}
         </View>
         
         <View style={styles.footer}>
@@ -203,8 +209,8 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 200,
+    height: 200,
     borderRadius: 20,
   },
   appName: {
