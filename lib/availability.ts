@@ -543,13 +543,7 @@ export async function debugAvailabilityTables(userId: string) {
   console.log('Debugging availability for user ID:', userId);
   
   try {
-    // Log the SQL function details
-    console.log('SQL Function Definition Expected Fields:');
-    console.log('The get_sitter_availability_for_date function should return:');
-    console.log('- id UUID');
-    console.log('- weekday INT or weekday_number INT');
-    console.log('- start_time TIME');
-    console.log('- end_time TIME');
+
     
     // Check for RPC function
     console.log('\nTesting RPC function...');

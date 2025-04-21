@@ -194,6 +194,15 @@ const AvailabilityManager = ({
   };
 
   const addTimeSlot = (day: string, start = '09:00', end = '19:00') => {
+    // Enforce only one time range per day for walking mode
+    if (mode === 'walking') {
+      const existingSlots = dayAvailability.find(d => d.day === day)?.timeSlots || [];
+      if (existingSlots.length >= 1) {
+        Alert.alert('One Time Range Only', 'You can only have one time range per day for walking.');
+        return;
+      }
+    }
+
     const newSlot = {
       id: Math.random().toString(36).substring(2, 9),
       start,
@@ -557,14 +566,16 @@ const AvailabilityManager = ({
           {/* Custom time slots */}
           <View style={styles.timeSlotsContainer}>
             <View style={styles.timeSlotsHeader}>
-              <Text style={styles.sectionSubtitle}>Your Time Slots:</Text>
-              <TouchableOpacity 
-                style={styles.addButton}
-                onPress={() => openTimePicker(item.day, null, 'start')}
-              >
-                <MaterialCommunityIcons name="plus" size={16} color="white" />
-                <Text style={styles.addButtonText}>Add</Text>
-              </TouchableOpacity>
+              <Text style={styles.sectionSubtitle}>Your Time Slot:</Text>
+              {!(mode === 'walking' && item.timeSlots.length >= 1) && (
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => openTimePicker(item.day, null, 'start')}
+                >
+                  <MaterialCommunityIcons name="plus" size={16} color="white" />
+                  <Text style={styles.addButtonText}>Add</Text>
+                </TouchableOpacity>
+              )}
             </View>
             
             {item.timeSlots.length === 0 ? (
