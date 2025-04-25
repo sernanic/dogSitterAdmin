@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform, ToastAndroid } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Bell, Shield, CreditCard, CircleHelp as HelpCircle, LogOut, MapPin, Clock, CalendarX, AlertCircle, ArrowLeft, DollarSign } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -58,7 +58,7 @@ export default function SettingsScreen() {
       const address = await getPrimaryAddress(user?.id as string);
       setPrimaryAddress(address);
     } catch (error) {
-      console.error('Error loading primary address:', error);
+      console.log('Error loading primary address:', error);
     }
   };
   
@@ -84,6 +84,38 @@ export default function SettingsScreen() {
     }));
   };
   
+  // Handle avatar upload
+  const handleAvatarUpload = async (uri: string) => {
+    try {
+      setIsSubmitting(true);
+      
+      if (!user) {
+        throw new Error('User not found');
+      }
+      
+      // Use the updateAvatar function from auth store
+      const avatarUrl = await useAuthStore.getState().updateAvatar(uri);
+      
+      // Update form data with new avatar URL
+      setEditProfileForm(prev => ({
+        ...prev,
+        avatar_url: avatarUrl
+      }));
+      
+      // Show success message
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Profile picture updated!', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Success', 'Profile picture updated!');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      Alert.alert('Error', 'Could not update profile picture. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Submit profile updates
   const handleSubmitProfileUpdate = async () => {
     try {
@@ -110,18 +142,20 @@ export default function SettingsScreen() {
         updateData.location = editProfileForm.location;
       }
       
-      // Update user info in store
+      // Update the user profile
       await useAuthStore.getState().updateUser(updateData);
       
-      // Close modal and refresh session
+      // Close the modal
       setIsEditModalVisible(false);
-      await refreshSession();
       
       // Show success message
-      Alert.alert('Success', 'Profile updated successfully');
+      Alert.alert('Success', 'Profile updated successfully!');
+      
+      // Refresh user data
+      await refreshSession();
     } catch (error) {
-      console.error('Error updating profile:', error);
-      setFormError('Failed to update profile');
+      setFormError('Failed to update profile. Please try again.');
+      console.log('Profile update error:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -141,11 +175,19 @@ export default function SettingsScreen() {
           text: 'Logout',
           onPress: async () => {
             try {
-              await useAuthStore.getState().logout();
-              router.replace('/auth');
+              // Get logout function directly from the store
+              const logout = useAuthStore.getState().logout;
+              
+              // Log some debugging info
+              console.log('Starting logout process');
+              
+              // Perform the logout
+              await logout();
+              
+              console.log('Logout successful, AuthGuard should handle redirect.');
             } catch (error) {
               console.error('Error logging out:', error);
-              Alert.alert('Error', 'Failed to log out');
+              Alert.alert('Error', 'Failed to log out. Please try again.');
             }
           },
         },
@@ -357,6 +399,7 @@ export default function SettingsScreen() {
         onSubmit={handleSubmitProfileUpdate}
         isSubmitting={isSubmitting}
         formError={formError}
+        onUploadAvatar={handleAvatarUpload}
       />
       
       {/* Address Manager Modal */}

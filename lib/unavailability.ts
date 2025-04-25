@@ -81,7 +81,7 @@ export async function fetchUserUnavailability(userId: string): Promise<SimpleDat
     return unavailabilityMap;
     
   } catch (error) {
-    console.error('[fetchUserUnavailability] Fatal error:', error);
+    console.log('[fetchUserUnavailability] Fatal error:', error);
     return null; // Indicate error, store will handle setting state
   }
 }
@@ -125,7 +125,7 @@ export async function saveUserUnavailability(
     return true; // Indicate success
     
   } catch (error) {
-    console.error('[saveUserUnavailability] Error:', error);
+    console.log('[saveUserUnavailability] Error:', error);
     return false; // Indicate failure
   }
 }

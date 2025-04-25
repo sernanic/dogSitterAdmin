@@ -41,12 +41,12 @@ async function initializeNotifications(userId?: string, appType: 'user' | 'sitte
           .eq('id', userId);
         
         if (error) {
-          console.error('Error storing push token:', error.message);
+          console.log('Error storing push token:', error.message);
         } else {
           console.log('Push token stored successfully for user:', userId, 'as', appType);
         }
       } catch (err) {
-        console.error('Error updating push token in Supabase:', err);
+        console.log('Error updating push token in Supabase:', err);
       }
     }
   }

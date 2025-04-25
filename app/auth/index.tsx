@@ -1,335 +1,72 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
-import { Link, router } from 'expo-router';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
-import { useAuthStore } from '../../store/useAuthStore';
+import React from 'react';
+import { View, Image, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { useRouter } from 'expo-router';
 
-export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const login = useAuthStore(state => state.login);
-  const loginWithSocial = useAuthStore(state => state.loginWithSocial);
-
-  const handleLogin = async () => {
-    // Basic validation
-    if (!email || !password) {
-      setError('Please fill in all fields');
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Use the Zustand store's login action with Supabase
-      await login(email, password);
-      
-      // Redirect to tabs on successful login
-      router.replace('/(tabs)');
-    } catch (error: any) {
-      // Only show user-friendly message in UI
-      setError('Invalid login credentials.');
-      // In development, we can still log the error for debugging
-      if (__DEV__) {
-        console.log('Login error:', error);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSocialLogin = async (provider: string) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Use the Zustand store's social login action with Supabase
-      await loginWithSocial(provider);
-      
-      // Note: For OAuth, the redirect will be handled by Supabase
-      // We don't need to navigate manually here
-    } catch (error: any) {
-      // Show a user-friendly error message
-      setError(`${provider} login failed. Please try again.`);
-      // Only log detailed errors in development
-      if (__DEV__) {
-        console.log(`${provider} login error:`, error);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+export default function MainScreenAuth() {
+  const router = useRouter();
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('../../assets/images/IMG_3648.jpg')}
-            style={styles.logo}
-          />
-        </View>
-
-        <View style={styles.formContainer}>
-          <Text style={styles.title}>Sign In</Text>
-          
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          
-          <View style={styles.inputContainer}>
-            <Mail size={20} color="#999" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Email Address"
-              placeholderTextColor="#999"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-          
-          <View style={styles.inputContainer}>
-            <Lock size={20} color="#999" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#999"
-              secureTextEntry={!showPassword}
-              autoComplete="password"
-              autoCapitalize="none"
-              textContentType="password"
-              value={password}
-              onChangeText={setPassword}
-            />
-            <TouchableOpacity 
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
-            >
-              {showPassword ? (
-                <EyeOff size={20} color="#999" />
-              ) : (
-                <Eye size={20} color="#999" />
-              )}
-            </TouchableOpacity>
-          </View>
-          
-          <TouchableOpacity 
-            onPress={handleLogin} 
-            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.loginButtonText}>Log In</Text>
-            )}
-          </TouchableOpacity>
-          
-          <Link href="/auth/forgot-password" asChild>
-            <TouchableOpacity>
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-            </TouchableOpacity>
-          </Link>
-          
-          <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.divider} />
-          </View>
-          
-          {/* <View style={styles.socialButtonsContainer}>
-            <TouchableOpacity 
-              style={styles.socialButton}
-              onPress={() => handleSocialLogin('google')}
-              disabled={isLoading}
-            >
-              <Image
-                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }}
-                style={styles.socialIcon}
-              />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.socialButton}
-              onPress={() => handleSocialLogin('facebook')}
-              disabled={isLoading}
-            >
-              <Image
-                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Facebook_Logo_%282019%29.png/600px-Facebook_Logo_%282019%29.png' }}
-                style={styles.socialIcon}
-              />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.socialButton}
-              onPress={() => handleSocialLogin('apple')}
-              disabled={isLoading}
-            >
-              <Image
-                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/512px-Apple_logo_black.svg.png' }}
-                style={[styles.socialIcon, styles.appleLogo]}
-              />
-            </TouchableOpacity>
-          </View> */}
-        </View>
-        
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account?</Text>
-          <Link href="/auth/register" asChild>
-            <TouchableOpacity>
-              <Text style={styles.registerText}>Register</Text>
-            </TouchableOpacity>
-          </Link>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <View style={styles.container}>
+      <Image
+        source={require('../../assets/images/mainScreenAuth.png')}
+        style={styles.image}
+        resizeMode="contain"
+      />
+      <TouchableOpacity
+        style={styles.createAccountButton}
+        onPress={() => router.push('/auth/register')}
+      >
+        <Text style={styles.createAccountText}>Create Account</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.signInButton}
+        onPress={() => router.push('/auth/login')}
+      >
+        <Text style={styles.signInText}>Sign In</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    padding: 20,
-  },
-  logoContainer: {
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 50,
+    backgroundColor: '#FCFCF2',
+    paddingHorizontal: 24,
+  },
+  image: {
+    width: '100%',
+    height: 480,
     marginBottom: 30,
+    marginTop: 0,
   },
-  logo: {
-    width: 200,
-    height: 200,
-    borderRadius: 20,
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginTop: 10,
-    color: '#333',
-  },
-  tagline: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 5,
-  },
-  formContainer: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
-  },
-  errorText: {
-    color: '#FF3B30',
-    marginBottom: 15,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#DDD',
-    borderRadius: 10,
-    marginBottom: 15,
-    paddingHorizontal: 15,
-    backgroundColor: '#F5F5F5',
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 15,
-    color: '#333',
-  },
-  eyeIcon: {
-    padding: 10,
-  },
-  loginButton: {
+  createAccountButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 50,
     backgroundColor: '#62C6B9',
-    borderRadius: 10,
-    paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 15,
+    marginBottom: 20,
   },
-  loginButtonDisabled: {
-    backgroundColor: '#A7E0D9',
+  createAccountText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 22,
   },
-  loginButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
+  signInButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#62C6B9',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
-  forgotPasswordText: {
+  signInText: {
     color: '#62C6B9',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#DDD',
-  },
-  dividerText: {
-    color: '#999',
-    paddingHorizontal: 10,
-  },
-  socialButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  socialButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: '#DDD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 10,
-    backgroundColor: '#FFF',
-  },
-  socialIcon: {
-    width: 30,
-    height: 30,
-    resizeMode: 'contain',
-  },
-  appleLogo: {
-    width: 25,
-    height: 25,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: 20,
-  },
-  footerText: {
-    color: '#666',
-    marginRight: 5,
-  },
-  registerText: {
-    color: '#62C6B9',
-    fontWeight: '600',
+    fontWeight: 'bold',
+    fontSize: 22,
   },
 });

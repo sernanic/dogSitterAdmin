@@ -76,7 +76,7 @@ export default function ResetPasswordScreen() {
       }, 2000);
 
     } catch (err: any) {
-      console.error('Error updating password:', err);
+      console.log('Error updating password:', err);
       setError(err.message || 'Failed to update password. Please try again.');
     } finally {
       setLoading(false);

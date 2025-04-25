@@ -75,7 +75,7 @@ export default function ProfileScreen() {
       const images = await getPortfolioImages(user.id);
       setPortfolioImages(images);
     } catch (error) {
-      console.error('Error fetching portfolio images:', error);
+      console.log('Error fetching portfolio images:', error);
       Alert.alert('Error', 'Could not load portfolio images');
     } finally {
       setLoading(false);
@@ -109,7 +109,7 @@ export default function ProfileScreen() {
         Alert.alert('Success', 'Profile picture updated successfully!');
       }
     } catch (error) {
-      console.error('Error uploading avatar:', error);
+      console.log('Error uploading avatar:', error);
       Alert.alert('Error', 'Could not update profile picture');
     } finally {
       setIsSubmitting(false);
@@ -158,14 +158,14 @@ export default function ProfileScreen() {
             Alert.alert('Success', 'Background updated successfully!');
           }
         } catch (error) {
-          console.error('Error uploading background:', error);
+          console.log('Error uploading background:', error);
           Alert.alert('Error', 'Could not update background image');
         } finally {
           setUploadingBackground(false);
         }
       }
     } catch (error) {
-      console.error('Error launching image library:', error);
+      console.log('Error launching image library:', error);
       Alert.alert('Error', 'Could not open gallery');
       setUploadingBackground(false);
     }
@@ -222,7 +222,7 @@ export default function ProfileScreen() {
         uploadImage(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error launching camera:', error);
+      console.log('Error launching camera:', error);
       Alert.alert('Error', 'Could not open camera');
     }
   };
@@ -250,7 +250,7 @@ export default function ProfileScreen() {
         uploadImage(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error launching image library:', error);
+      console.log('Error launching image library:', error);
       Alert.alert('Error', 'Could not open gallery');
     }
   };
@@ -282,7 +282,7 @@ export default function ProfileScreen() {
         Alert.alert('Success', 'Image uploaded successfully!');
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.log('Error uploading image:', error);
       Alert.alert('Error', 'Could not upload image');
     } finally {
       setUploading(false);
@@ -317,7 +317,7 @@ export default function ProfileScreen() {
                 Alert.alert('Success', 'Image deleted successfully!');
               }
             } catch (error) {
-              console.error('Error deleting image:', error);
+              console.log('Error deleting image:', error);
               Alert.alert('Error', 'Could not delete image');
             }
           },
@@ -382,7 +382,7 @@ export default function ProfileScreen() {
         Alert.alert('Success', 'Profile updated successfully!');
       }
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.log('Error updating profile:', error);
       setFormError('Could not update profile');
     } finally {
       setIsSubmitting(false);

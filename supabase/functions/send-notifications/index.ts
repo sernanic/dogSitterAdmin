@@ -61,7 +61,7 @@ serve(async (req) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error processing notification:', errorMessage);
+    console.log('Error processing notification:', errorMessage);
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: {
         ...corsHeaders,
@@ -75,12 +75,12 @@ serve(async (req) => {
 async function handleMessageNotification(message) {
   const thread = await db.getMessageThread(message.thread_id);
   if (!thread) {
-    console.error('Thread not found:', message.thread_id);
+    console.log('Thread not found:', message.thread_id);
     return;
   }
   const sender = await db.getProfile(message.sender_id);
   if (!sender) {
-    console.error('Sender not found:', message.sender_id);
+    console.log('Sender not found:', message.sender_id);
     return;
   }
   // Determine recipient based on thread participants
@@ -116,7 +116,7 @@ async function handleBookingNotification(table, booking, oldBooking) {
   ]);
   
   if (!owner || !sitter) {
-    console.error('Owner or sitter not found');
+    console.log('Owner or sitter not found');
     return;
   }
   
@@ -174,7 +174,7 @@ async function handleBookingNotification(table, booking, oldBooking) {
 async function handleReviewNotification(review) {
   const reviewer = await db.getProfile(review.reviewer_id);
   if (!reviewer) {
-    console.error('Reviewer not found:', review.reviewer_id);
+    console.log('Reviewer not found:', review.reviewer_id);
     return;
   }
   
@@ -204,7 +204,7 @@ async function sendPushNotification(recipientId: string, title: string, body: st
     // Get recipient's profile to retrieve push token and app type
     const recipient = await db.getProfile(recipientId);
     if (!recipient || !recipient.expo_push_token) {
-      console.error('Recipient or push token not found:', recipientId);
+      console.log('Recipient or push token not found:', recipientId);
       return;
     }
     
@@ -214,7 +214,7 @@ async function sendPushNotification(recipientId: string, title: string, body: st
     const accessToken = isUserApp ? USER_APP_ACCESS_TOKEN : SITTER_APP_ACCESS_TOKEN;
     
     if (!accessToken) {
-      console.error('No access token configured for app type:', isUserApp ? 'user' : 'sitter');
+      console.log('No access token configured for app type:', isUserApp ? 'user' : 'sitter');
       return;
     }
     
@@ -241,11 +241,11 @@ async function sendPushNotification(recipientId: string, title: string, body: st
     
     const result = await response.json();
     if (!response.ok) {
-      console.error('Failed to send push notification:', result);
+      console.log('Failed to send push notification:', result);
     } else {
       console.log('Push notification sent successfully to:', recipientId);
     }
   } catch (error) {
-    console.error('Error sending push notification:', error);
+    console.log('Error sending push notification:', error);
   }
 }

@@ -63,7 +63,7 @@ export const getSitterStats = async (sitterId: string): Promise<SitterStats> => 
       };
     }
     // Only log unexpected errors
-    console.error('Error fetching sitter stats:', error);
+    console.log('Error fetching sitter stats:', error);
     // Return default values for any error
     return {
       total_bookings: 0,
@@ -134,7 +134,7 @@ export const upsertProfile = async (profile: Partial<Profile>) => {
       .select();
     
     if (error) {
-      console.error("Error in regular upsert:", error);
+      console.log("Error in regular upsert:", error);
       
       // Try with service role client if available (requires separate implementation)
       // For registration, we'll rely on the trigger we created in the database
@@ -156,7 +156,7 @@ export const upsertProfile = async (profile: Partial<Profile>) => {
     
     return data?.[0];
   } catch (error) {
-    console.error("Profile creation error:", error);
+    console.log("Profile creation error:", error);
     throw error;
   }
 };
@@ -217,7 +217,7 @@ export const uploadAvatar = async (userId: string, uri: string): Promise<string>
         });
       
       if (error) {
-        console.error('Supabase storage upload error:', JSON.stringify(error, null, 2));
+        console.log('Supabase storage upload error:', JSON.stringify(error, null, 2));
         throw error;
       }
       
@@ -240,11 +240,11 @@ export const uploadAvatar = async (userId: string, uri: string): Promise<string>
       console.log('Avatar upload completed successfully');
       return urlData.publicUrl;
     } catch (uploadError) {
-      console.error('Caught error during upload step:', uploadError);
+      console.log('Caught error during upload step:', uploadError);
       throw uploadError;
     }
   } catch (error) {
-    console.error('Error uploading avatar:', error);
+    console.log('Error uploading avatar:', error);
     throw error;
   }
 };
@@ -263,7 +263,7 @@ export const updateAvatarUrl = async (userId: string, avatarUrl: string): Promis
     if (error) throw error;
     return data as Profile;
   } catch (error) {
-    console.error('Error updating avatar URL:', error);
+    console.log('Error updating avatar URL:', error);
     throw error;
   }
 };
@@ -312,7 +312,7 @@ export const uploadProfileBackground = async (userId: string, uri: string): Prom
         });
       
       if (error) {
-        console.error('Supabase storage upload error:', JSON.stringify(error, null, 2));
+        console.log('Supabase storage upload error:', JSON.stringify(error, null, 2));
         throw error;
       }
       
@@ -335,11 +335,11 @@ export const uploadProfileBackground = async (userId: string, uri: string): Prom
       console.log('Background image upload completed successfully');
       return urlData.publicUrl;
     } catch (uploadError) {
-      console.error('Caught error during upload step:', uploadError);
+      console.log('Caught error during upload step:', uploadError);
       throw uploadError;
     }
   } catch (error) {
-    console.error('Error uploading background image:', error);
+    console.log('Error uploading background image:', error);
     throw error;
   }
 };
@@ -358,7 +358,7 @@ export const updateBackgroundUrl = async (userId: string, backgroundUrl: string)
     if (error) throw error;
     return data as Profile;
   } catch (error) {
-    console.error('Error updating background URL:', error);
+    console.log('Error updating background URL:', error);
     throw error;
   }
 };
@@ -375,7 +375,7 @@ export const getAddressesByProfileId = async (profileId: string): Promise<Addres
     if (error) throw error;
     return data as Address[];
   } catch (error) {
-    console.error('Error fetching addresses:', error);
+    console.log('Error fetching addresses:', error);
     throw error;
   }
 };
@@ -397,7 +397,7 @@ export const getPrimaryAddress = async (profileId: string): Promise<Address | nu
     }
     return data as Address;
   } catch (error) {
-    console.error('Error fetching primary address:', error);
+    console.log('Error fetching primary address:', error);
     throw error;
   }
 };
@@ -426,7 +426,7 @@ export const upsertAddress = async (address: Partial<Address>): Promise<Address>
         .single();
         
       if (error) {
-        console.error('Error updating address:', error);
+        console.log('Error updating address:', error);
         throw error;
       }
       
@@ -441,14 +441,14 @@ export const upsertAddress = async (address: Partial<Address>): Promise<Address>
         .single();
         
       if (error) {
-        console.error('Error inserting address:', error);
+        console.log('Error inserting address:', error);
         throw error;
       }
       
       return data as Address;
     }
   } catch (error) {
-    console.error('Error upserting address:', error);
+    console.log('Error upserting address:', error);
     throw error;
   }
 };
@@ -470,7 +470,7 @@ export const setPrimaryAddress = async (addressId: string, profileId: string): P
       
     if (error) throw error;
   } catch (error) {
-    console.error('Error setting primary address:', error);
+    console.log('Error setting primary address:', error);
     throw error;
   }
 };
@@ -491,11 +491,11 @@ export const getSitterUnavailableDates = async (sitterId: string): Promise<Sitte
         .eq('sitter_id', sitterId);
         
       if (countError) {
-        console.error('[getSitterUnavailableDates] Error checking table:', countError);
+        console.log('[getSitterUnavailableDates] Error checking table:', countError);
         
         // Table might not exist, return empty array
         if (countError.code === '42P01') { // undefined_table
-          console.error('[getSitterUnavailableDates] Table does not exist');
+          console.log('[getSitterUnavailableDates] Table does not exist');
           return [];
         }
         
@@ -505,7 +505,7 @@ export const getSitterUnavailableDates = async (sitterId: string): Promise<Sitte
       
       console.log(`[getSitterUnavailableDates] Found ${count} records for sitter`);
     } catch (checkError) {
-      console.error('[getSitterUnavailableDates] Error checking table existence:', checkError);
+      console.log('[getSitterUnavailableDates] Error checking table existence:', checkError);
       // Continue with main query anyway
     }
     
@@ -516,14 +516,14 @@ export const getSitterUnavailableDates = async (sitterId: string): Promise<Sitte
       .eq('sitter_id', sitterId);
       
     if (error) {
-      console.error('[getSitterUnavailableDates] Query error:', error);
+      console.log('[getSitterUnavailableDates] Query error:', error);
       throw error;
     }
     
     console.log(`[getSitterUnavailableDates] Successfully fetched ${data?.length || 0} unavailable dates`);
     return data as SitterUnavailability[];
   } catch (error) {
-    console.error('[getSitterUnavailableDates] Fatal error:', error);
+    console.log('[getSitterUnavailableDates] Fatal error:', error);
     // Return empty array instead of throwing, to prevent UI from hanging
     return [];
   }
@@ -544,14 +544,14 @@ export const addSitterUnavailableDate = async (sitterId: string, unavailableDate
       .single();
       
     if (error) {
-      console.error('Error adding unavailable date:', error);
+      console.log('Error adding unavailable date:', error);
       throw error;
     }
     
     console.log('Successfully added unavailable date:', data);
     return data as SitterUnavailability;
   } catch (error) {
-    console.error('Error in addSitterUnavailableDate:', error);
+    console.log('Error in addSitterUnavailableDate:', error);
     throw error;
   }
 };
@@ -568,13 +568,13 @@ export const deleteSitterUnavailableDate = async (sitterId: string, unavailableD
       .eq('unavailable_date', unavailableDate);
       
     if (error) {
-      console.error('Error deleting unavailable date:', error);
+      console.log('Error deleting unavailable date:', error);
       throw error;
     }
     
     console.log('Successfully deleted unavailable date');
   } catch (error) {
-    console.error('Error in deleteSitterUnavailableDate:', error);
+    console.log('Error in deleteSitterUnavailableDate:', error);
     throw error;
   }
 };
@@ -592,7 +592,7 @@ export const checkSitterAvailabilityForDate = async (sitterId: string, date: str
       .eq('unavailable_date', date);
       
     if (error) {
-      console.error('Error checking unavailability:', error);
+      console.log('Error checking unavailability:', error);
       throw error;
     }
     
@@ -610,7 +610,7 @@ export const checkSitterAvailabilityForDate = async (sitterId: string, date: str
     console.log('Sitter appears to be available on this date');
     return true;
   } catch (error) {
-    console.error('Error in checkSitterAvailabilityForDate:', error);
+    console.log('Error in checkSitterAvailabilityForDate:', error);
     throw error;
   }
 };
@@ -626,13 +626,13 @@ export const clearSitterUnavailableDates = async (sitterId: string): Promise<voi
       .eq('sitter_id', sitterId);
       
     if (error) {
-      console.error('Error clearing unavailable dates:', error);
+      console.log('Error clearing unavailable dates:', error);
       throw error;
     }
     
     console.log('Successfully cleared all unavailable dates');
   } catch (error) {
-    console.error('Error in clearSitterUnavailableDates:', error);
+    console.log('Error in clearSitterUnavailableDates:', error);
     throw error;
   }
 }; 
@@ -671,14 +671,14 @@ export const getSitterEarnings = async (sitterId: string): Promise<SitterEarning
         };
       }
       
-      console.error('Error fetching sitter earnings from summary view:', error);
+      console.log('Error fetching sitter earnings from summary view:', error);
       
       // Fallback: Call the function directly
       const { data: functionData, error: functionError } = await supabase
         .rpc('get_sitter_earnings', { p_sitter_id: sitterId });
       
       if (functionError) {
-        console.error('Error fetching sitter earnings via function:', functionError);
+        console.log('Error fetching sitter earnings via function:', functionError);
         // Return default values if all methods fail
         return {
           today: '$0.00',
@@ -715,7 +715,7 @@ export const getSitterEarnings = async (sitterId: string): Promise<SitterEarning
       pendingInvoicesCount: data.pending_invoices_count || 0
     };
   } catch (error) {
-    console.error('Error in getSitterEarnings:', error);
+    console.log('Error in getSitterEarnings:', error);
     return {
       today: '$0.00',
       thisWeek: '$0.00',
@@ -766,13 +766,13 @@ export const getSitterInfo = async (sitterId: string): Promise<SitterInfo | null
         // For new sitters, it's normal to not have info yet
         return null;
       }
-      console.error('Error fetching sitter info:', error);
+      console.log('Error fetching sitter info:', error);
       return null;
     }
     
     return data;
   } catch (error) {
-    console.error('Error in getSitterInfo:', error);
+    console.log('Error in getSitterInfo:', error);
     return null;
   }
 };
@@ -797,13 +797,13 @@ export const updateWalkingRates = async (
       .single();
     
     if (error) {
-      console.error('Error updating walking rates:', error);
+      console.log('Error updating walking rates:', error);
       return null;
     }
     
     return data;
   } catch (error) {
-    console.error('Error in updateWalkingRates:', error);
+    console.log('Error in updateWalkingRates:', error);
     return null;
   }
 };
@@ -828,13 +828,13 @@ export const updateBoardingRates = async (
       .single();
     
     if (error) {
-      console.error('Error updating boarding rates:', error);
+      console.log('Error updating boarding rates:', error);
       return null;
     }
     
     return data;
   } catch (error) {
-    console.error('Error in updateBoardingRates:', error);
+    console.log('Error in updateBoardingRates:', error);
     return null;
   }
 };
@@ -861,7 +861,7 @@ export const getPortfolioImages = async (sitterId: string): Promise<PortfolioIma
     if (error) throw error;
     return data as PortfolioImage[];
   } catch (error) {
-    console.error('Error fetching portfolio images:', error);
+    console.log('Error fetching portfolio images:', error);
     throw error;
   }
 };
@@ -906,7 +906,7 @@ export const uploadPortfolioImage = async (sitterId: string, uri: string, descri
         });
       
       if (error) {
-        console.error('Supabase storage upload error:', error);
+        console.log('Supabase storage upload error:', error);
         throw error;
       }
       
@@ -935,17 +935,17 @@ export const uploadPortfolioImage = async (sitterId: string, uri: string, descri
         .single();
         
       if (imageError) {
-        console.error('Error saving portfolio image metadata:', imageError);
+        console.log('Error saving portfolio image metadata:', imageError);
         throw imageError;
       }
       
       return imageData as PortfolioImage;
     } catch (uploadError) {
-      console.error('Caught error during upload step:', uploadError);
+      console.log('Caught error during upload step:', uploadError);
       throw uploadError;
     }
   } catch (error) {
-    console.error('Error uploading portfolio image:', error);
+    console.log('Error uploading portfolio image:', error);
     throw error;
   }
 };
@@ -972,7 +972,7 @@ export const deletePortfolioImage = async (imageId: string, imageUrl: string): P
       .remove([fileName]);
       
     if (storageError) {
-      console.error('Error removing file from storage:', storageError);
+      console.log('Error removing file from storage:', storageError);
       // Continue to delete the database record even if storage deletion fails
     }
     
@@ -985,7 +985,7 @@ export const deletePortfolioImage = async (imageId: string, imageUrl: string): P
     if (dbError) throw dbError;
     
   } catch (error) {
-    console.error('Error deleting portfolio image:', error);
+    console.log('Error deleting portfolio image:', error);
     throw error;
   }
 };

@@ -48,13 +48,13 @@ export async function fetchUserAvailability(userId: string): Promise<Availabilit
       .single();
 
     if (error) {
-      console.error('Error fetching availability:', error);
+      console.log('Error fetching availability:', error);
       throw error;
     }
 
     return data;
   } catch (error) {
-    console.error('Error in fetchUserAvailability:', error);
+    console.log('Error in fetchUserAvailability:', error);
     throw error;
   }
 }
@@ -122,7 +122,7 @@ export async function saveUserAvailability(
 
     return result;
   } catch (error) {
-    console.error('Error in saveUserAvailability:', error);
+    console.log('Error in saveUserAvailability:', error);
     throw error;
   }
 }
@@ -140,7 +140,7 @@ export async function deleteUserAvailability(userId: string): Promise<void> {
 
     if (error) throw error;
   } catch (error) {
-    console.error('Error in deleteUserAvailability:', error);
+    console.log('Error in deleteUserAvailability:', error);
     throw error;
   }
 }
@@ -164,13 +164,13 @@ export async function fetchUserBoardingAvailability(userId: string): Promise<Boa
       .order('available_date', { ascending: true });
 
     if (error) {
-      console.error('Error fetching boarding availability:', error);
+      console.log('Error fetching boarding availability:', error);
       throw error;
     }
 
     return data || [];
   } catch (error) {
-    console.error('Error in fetchUserBoardingAvailability:', error);
+    console.log('Error in fetchUserBoardingAvailability:', error);
     return [];
   }
 }
@@ -195,13 +195,13 @@ export async function checkDayHasUnavailability(userId: string, date: Date): Pro
       .eq('unavailable_date', dateStr);
 
     if (error) {
-      console.error('Error checking day unavailability:', error);
+      console.log('Error checking day unavailability:', error);
       return false;
     }
 
     return Boolean(data && data.length > 0);
   } catch (error) {
-    console.error('Error in checkDayHasUnavailability:', error);
+    console.log('Error in checkDayHasUnavailability:', error);
     return false;
   }
 }
@@ -217,12 +217,12 @@ export async function saveUserBoardingAvailability(
   dates: Date[]
 ): Promise<{ success: boolean, error?: string }> {
   if (!userId) {
-    console.error('saveUserBoardingAvailability called with no userId');
+    console.log('saveUserBoardingAvailability called with no userId');
     return { success: false, error: 'User ID is required' };
   }
   
   if (!dates || !Array.isArray(dates)) {
-    console.error('saveUserBoardingAvailability called with invalid dates:', dates);
+    console.log('saveUserBoardingAvailability called with invalid dates:', dates);
     return { success: false, error: 'Valid dates array is required' };
   }
 
@@ -256,7 +256,7 @@ export async function saveUserBoardingAvailability(
         .in('id', idsToRemove);
       
       if (deleteError) {
-        console.error('Error removing boarding dates:', deleteError);
+        console.log('Error removing boarding dates:', deleteError);
         return { success: false, error: 'Failed to remove dates: ' + deleteError.message };
       }
     }
@@ -279,7 +279,7 @@ export async function saveUserBoardingAvailability(
         .select();
       
       if (insertError) {
-        console.error('Error adding boarding dates:', insertError);
+        console.log('Error adding boarding dates:', insertError);
         return { success: false, error: 'Failed to add dates: ' + insertError.message };
       }
       
@@ -294,7 +294,7 @@ export async function saveUserBoardingAvailability(
     
     return { success: true };
   } catch (error: any) {
-    console.error('Error in saveUserBoardingAvailability:', error);
+    console.log('Error in saveUserBoardingAvailability:', error);
     return { success: false, error: error.message || 'An unknown error occurred' };
   }
 }
@@ -411,7 +411,7 @@ export function validateTimeSlot(slot: TimeSlot): string | null {
     
     return null;
   } catch (error) {
-    console.error('[Validation] Error validating time slot:', error);
+    console.log('[Validation] Error validating time slot:', error);
     return 'Invalid time format. Please use HH:MM format.';
   }
 }
@@ -468,7 +468,7 @@ export async function getDirectSitterAvailability(userId: string) {
       .eq('sitter_id', userId);
     
     if (error) {
-      console.error('[API] Database error:', error);
+      console.log('[API] Database error:', error);
       throw error;
     }
     
@@ -522,7 +522,7 @@ export async function getDirectSitterAvailability(userId: string) {
       error: null 
     };
   } catch (error: any) {
-    console.error('[API] Direct query error:', error);
+    console.log('[API] Direct query error:', error);
     return { 
       data: {
         monday: [],
@@ -598,7 +598,7 @@ export async function debugAvailabilityTables(userId: string) {
       schema: tablesResult,
     };
   } catch (error) {
-    console.error('Debug error:', error);
+    console.log('Debug error:', error);
     return { error };
   }
 }

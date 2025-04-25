@@ -45,7 +45,7 @@ serve(async (req: Request) => {
       requestBody = await req.json();
       console.log('Request body:', requestBody);
     } catch (e) {
-      console.error('Failed to parse request body:', e);
+      console.log('Failed to parse request body:', e);
       return new Response(
         JSON.stringify({ error: 'Invalid request body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -55,7 +55,7 @@ serve(async (req: Request) => {
     // Get Stripe API key from environment variable
     const stripeApiKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeApiKey) {
-      console.error('Missing STRIPE_SECRET_KEY environment variable');
+      console.log('Missing STRIPE_SECRET_KEY environment variable');
       return new Response(
         JSON.stringify({ error: "Server configuration error: Missing Stripe key" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -73,7 +73,7 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Missing Supabase environment variables');
+      console.log('Missing Supabase environment variables');
       return new Response(
         JSON.stringify({ error: "Server configuration error: Missing Supabase configuration" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -87,7 +87,7 @@ serve(async (req: Request) => {
     console.log('Auth header present:', !!authHeader);
     
     if (!authHeader) {
-      console.error('No authorization header provided');
+      console.log('No authorization header provided');
       return new Response(
         JSON.stringify({ 
           error: "No authorization header provided",
@@ -106,7 +106,7 @@ serve(async (req: Request) => {
     console.log('Auth response:', { hasUser: !!user, hasError: !!authError });
     
     if (authError) {
-      console.error('Auth error:', authError);
+      console.log('Auth error:', authError);
       return new Response(
         JSON.stringify({ 
           error: "Invalid authorization token",
@@ -117,7 +117,7 @@ serve(async (req: Request) => {
     }
     
     if (!user) {
-      console.error('No user found in auth response');
+      console.log('No user found in auth response');
       return new Response(
         JSON.stringify({ error: "User not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -133,7 +133,7 @@ serve(async (req: Request) => {
       .single();
     
     if (profileError) {
-      console.error('Error fetching profile:', profileError);
+      console.log('Error fetching profile:', profileError);
       return new Response(
         JSON.stringify({ 
           error: "Failed to fetch user profile",
@@ -144,7 +144,7 @@ serve(async (req: Request) => {
     }
     
     if (!profile) {
-      console.error('No profile found for user:', user.id);
+      console.log('No profile found for user:', user.id);
       return new Response(
         JSON.stringify({ error: "User profile not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -160,7 +160,7 @@ serve(async (req: Request) => {
 
     // Verify the user is a sitter
     if (profile.role !== "sitter") {
-      console.error('User is not a sitter:', profile.role);
+      console.log('User is not a sitter:', profile.role);
       return new Response(
         JSON.stringify({ error: "Only sitters can onboard for payments" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -180,7 +180,7 @@ serve(async (req: Request) => {
           await stripe.accounts.list({ limit: 1 });
         } catch (connectError: any) {
           if (connectError.message?.includes('signed up for Connect')) {
-            console.error('Stripe Connect is not enabled:', connectError);
+            console.log('Stripe Connect is not enabled:', connectError);
             return new Response(
               JSON.stringify({
                 error: 'Stripe Connect setup required',
@@ -225,13 +225,13 @@ serve(async (req: Request) => {
           .select();  // Return the updated record to ensure atomic update
           
         if (updateError) {
-          console.error('Failed to update profile with Stripe account:', updateError);
+          console.log('Failed to update profile with Stripe account:', updateError);
           throw new Error('Failed to update profile with Stripe account ID');
         }
         
         console.log(`Updated profile ${profile.id} with Stripe account ${stripeAccountId}`);
       } catch (stripeError: any) {
-        console.error('Error creating Stripe account:', stripeError);
+        console.log('Error creating Stripe account:', stripeError);
         
         // Return a user-friendly error message
         return new Response(
@@ -266,7 +266,7 @@ serve(async (req: Request) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
-    console.error('Error in onboard-sitter:', error);
+    console.log('Error in onboard-sitter:', error);
     
     // Handle Stripe errors
     if (error.type) {

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "pikpup",
+    "name": "pikpup caregiver",
     "slug": "pikpup-dog-sitter-admin",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pikpup",
@@ -10,7 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nicolasserna.pikpup"
+      "bundleIdentifier": "com.nicolasserna.pikpup",
+      "buildNumber": "4.0.0",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.nicolasserna.pikpup",

@@ -46,8 +46,7 @@ export default function Register() {
       
       if (isAuthenticated) {
         // Successfully registered and authenticated
-        console.log('User registered and automatically signed in, redirecting to tabs');
-        router.replace('/(tabs)');
+        router.replace('/auth/payment-onboarding');
       } else {
         // Email confirmation required
         console.log('Email confirmation required, redirecting to login screen');
@@ -57,7 +56,7 @@ export default function Register() {
         router.replace('/auth');
       }
     } catch (error: any) {
-      console.error('Registration error details:', error);
+      console.log('Registration error details:', error);
       
       // Provide more specific error messages based on the error type
       if (typeof error === 'object' && error !== null) {
@@ -203,7 +202,7 @@ export default function Register() {
         
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account?</Text>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.replace('/auth/login')}>
             <Text style={styles.loginText}>Log In</Text>
           </TouchableOpacity>
         </View>

@@ -87,7 +87,7 @@ const EditProfileModal = ({
         onUploadAvatar(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error launching camera:', error);
+      console.log('Error launching camera:', error);
       Alert.alert('Error', 'Could not open camera');
     }
   };
@@ -112,7 +112,7 @@ const EditProfileModal = ({
         onUploadAvatar(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error launching image library:', error);
+      console.log('Error launching image library:', error);
       Alert.alert('Error', 'Could not open gallery');
     }
   };

@@ -74,7 +74,7 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
       const { data, error } = await getDirectSitterAvailability(userId);
       
       if (error) {
-        console.error('[Store] Error fetching availability:', error);
+        console.log('[Store] Error fetching availability:', error);
         // Even if there's an error, provide empty availability
         set({ 
           error: error,
@@ -116,7 +116,7 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
       }, fetchDebounceMS);
       
     } catch (error: any) {
-      console.error('[Store] Error in fetchAvailability:', error);
+      console.log('[Store] Error in fetchAvailability:', error);
       // Even on error, provide empty availability and turn off loading
       set({ 
         error: error.message || 'Failed to load availability',
@@ -145,7 +145,7 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
       const { data: currentAvailability, error: fetchError } = await getDirectSitterAvailability(userId);
       
       if (fetchError) {
-        console.error('[Store] Error fetching current availability:', fetchError);
+        console.log('[Store] Error fetching current availability:', fetchError);
         throw fetchError;
       }
       
@@ -230,7 +230,7 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
       // Check for errors
       const errors = results.filter(result => result.error);
       if (errors.length > 0) {
-        console.error('[Store] Errors during operations:', errors);
+        console.log('[Store] Errors during operations:', errors);
         throw errors[0].error;
       }
       
@@ -240,7 +240,7 @@ export const useAvailabilityStore = create<AvailabilityState>((set, get) => ({
       
       return { success: true };
     } catch (error: any) {
-      console.error('[Store] Error saving availability:', error);
+      console.log('[Store] Error saving availability:', error);
       set({ error: error.message, isLoading: false });
       return { success: false, error: error.message };
     }

@@ -64,7 +64,7 @@ const BookingsScreen: React.FC = () => {
       refetchBookings();  // Refetch to update the lists
     } else {
       // Error handling (optional: show an alert)
-      console.error("Failed to update booking status in modal handler.");
+      console.log("Failed to update booking status in modal handler.");
       // Alert.alert("Error", "Failed to update booking status.");
     }
   };

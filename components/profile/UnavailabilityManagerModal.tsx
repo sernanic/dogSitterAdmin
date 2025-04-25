@@ -61,7 +61,7 @@ const UnavailabilityManagerModal = ({
             setForceShowEmpty(true);
           })
           .catch(err => {
-            console.error('UnavailabilityModal: Error fetching data', err);
+            console.log('UnavailabilityModal: Error fetching data', err);
             // Force show the empty state on error
             setForceShowEmpty(true);
           });
@@ -101,7 +101,7 @@ const UnavailabilityManagerModal = ({
       }
       
       if (error) {
-        console.error('UnavailabilityModal: Error =', error);
+        console.log('UnavailabilityModal: Error =', error);
       }
     }
   }, [isVisible, isLoading, error, hasAttemptedLoad]);
@@ -170,7 +170,7 @@ const UnavailabilityManagerModal = ({
         .select('*', { count: 'exact', head: true });
         
       if (error) {
-        console.error('UnavailabilityModal: Error checking table:', error);
+        console.log('UnavailabilityModal: Error checking table:', error);
         
         if (error.code === '42P01') { // undefined_table
           Alert.alert(
@@ -197,7 +197,7 @@ const UnavailabilityManagerModal = ({
         .eq('sitter_id', user.id);
       
       if (userError) {
-        console.error('UnavailabilityModal: Error querying user data:', userError);
+        console.log('UnavailabilityModal: Error querying user data:', userError);
         Alert.alert(
           'Database Error',
           `Error querying user data: ${userError.message}`,
@@ -215,7 +215,7 @@ const UnavailabilityManagerModal = ({
       );
       
     } catch (error) {
-      console.error('UnavailabilityModal: Debug error:', error);
+      console.log('UnavailabilityModal: Debug error:', error);
       Alert.alert(
         'Debug Error',
         `An error occurred: ${error instanceof Error ? error.message : String(error)}`,

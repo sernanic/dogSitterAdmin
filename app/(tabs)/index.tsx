@@ -103,7 +103,7 @@ export default function HomeScreen() {
         totalClients: sitterStats.total_clients,
       });
     } catch (error) {
-      console.error('Error fetching sitter stats:', error);
+      console.log('Error fetching sitter stats:', error);
       
       // If something unexpected happens, set default values
       setStats({
@@ -124,7 +124,7 @@ export default function HomeScreen() {
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData?.session) {
-        console.error('Error getting session or no session:', sessionError);
+        console.log('Error getting session or no session:', sessionError);
         // Handle appropriately - maybe show login or specific message
         setEarningsData({ today: 0, thisWeek: 0, thisMonth: 0 }); // Reset to numbers
         return; // Exit if not authenticated
@@ -133,7 +133,7 @@ export default function HomeScreen() {
       const { data, error } = await supabase.functions.invoke('get-sitter-earnings');
 
       if (error) {
-        console.error('Error fetching earnings:', error);
+        console.log('Error fetching earnings:', error);
         // Optionally set an error state here to show in the UI
         setEarningsData({ today: 0, thisWeek: 0, thisMonth: 0 }); // Reset to numbers
       } else if (data) {
@@ -148,7 +148,7 @@ export default function HomeScreen() {
          setEarningsData({ today: 0, thisWeek: 0, thisMonth: 0 }); // Reset to numbers
       }
     } catch (error) {
-      console.error('Unexpected error fetching earnings:', error);
+      console.log('Unexpected error fetching earnings:', error);
       setEarningsData({ today: 0, thisWeek: 0, thisMonth: 0 }); // Reset to numbers
     } finally {
       setLoadingEarnings(false);
@@ -178,7 +178,7 @@ export default function HomeScreen() {
           console.log('Notification token ready:', token);
         }
       }).catch(err => {
-        console.error('Error initializing notifications:', err);
+        console.log('Error initializing notifications:', err);
       });
     }
   }, [user]);
@@ -200,7 +200,7 @@ export default function HomeScreen() {
         .limit(2);
         
       if (error) {
-        console.error('Error fetching bookings:', error);
+        console.log('Error fetching bookings:', error);
         setUpcomingBookings([]);
         return;
       }
@@ -221,7 +221,7 @@ export default function HomeScreen() {
         .in('id', ownerIds);
         
       if (profilesError) {
-        console.error('Error fetching owner profiles:', profilesError);
+        console.log('Error fetching owner profiles:', profilesError);
         // Still set the bookings, but owners might show as "Loading..."
         setUpcomingBookings(bookingsData);
         return;
@@ -258,7 +258,7 @@ export default function HomeScreen() {
             }
           }
         } catch (e) {
-          console.error('Error parsing pets from booking ID ' + booking.id + ':', e);
+          console.log('Error parsing pets from booking ID ' + booking.id + ':', e);
           console.log('Raw selected_pets value:', booking.selected_pets);
         }
       });
@@ -297,7 +297,7 @@ export default function HomeScreen() {
       // Set the bookings data
       setUpcomingBookings(bookingsData);
     } catch (error) {
-      console.error('Error fetching upcoming bookings:', error);
+      console.log('Error fetching upcoming bookings:', error);
       // Set empty bookings on error
       setUpcomingBookings([]);
     } finally {
@@ -347,7 +347,7 @@ export default function HomeScreen() {
         }
       }
     } catch (e) {
-      console.error('Error parsing pet IDs in formatPetsList:', e);
+      console.log('Error parsing pet IDs in formatPetsList:', e);
     }
     return 'No pets';
   };
@@ -374,7 +374,7 @@ export default function HomeScreen() {
         fetchSitterEarnings()
       ]);
     } catch (error) {
-      console.error('Error refreshing data:', error);
+      console.log('Error refreshing data:', error);
     } finally {
       setRefreshing(false);
     }

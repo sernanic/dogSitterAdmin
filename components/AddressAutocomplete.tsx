@@ -23,7 +23,7 @@ const verifyApiKey = async () => {
     console.log("API Key test result:", data.status);
     return data.status === "OK" || data.status === "ZERO_RESULTS";
   } catch (error) {
-    console.error("API Key verification failed:", error);
+    console.log("API Key verification failed:", error);
     return false;
   }
 };
@@ -185,7 +185,7 @@ export default function AddressAutocomplete({
               fetchDetails={true}
               onPress={handlePlaceSelected}
               onFail={(error) => {
-                console.error("Google Places API failed:", error);
+                console.log("Google Places API failed:", error);
                 setManualMode(true);
               }}
               onNotFound={() => console.log("No results found")}

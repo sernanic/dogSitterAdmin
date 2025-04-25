@@ -121,7 +121,7 @@ const AvailabilityManagerModal = ({
       console.log(`Loaded ${dateArray.length} boarding dates`);
       setBoardingDates(dateArray);
     } catch (error: any) {
-      console.error('Error loading boarding availability:', error);
+      console.log('Error loading boarding availability:', error);
       setBoardingError(error.message || 'Failed to load boarding availability');
     } finally {
       setLoadingBoardingDates(false);
@@ -144,7 +144,7 @@ const AvailabilityManagerModal = ({
         Alert.alert('Error', result.error || 'Failed to save boarding availability');
       }
     } catch (error: any) {
-      console.error('Error saving boarding availability:', error);
+      console.log('Error saving boarding availability:', error);
       Alert.alert('Error', error.message || 'An error occurred while saving');
     } finally {
       setLocalLoading(false);
@@ -218,10 +218,10 @@ const AvailabilityManagerModal = ({
             );
           }
         } catch (e) {
-          console.error('Direct load failed:', e);
+          console.log('Direct load failed:', e);
         }
       } catch (e) {
-        console.error('Debug failed:', e);
+        console.log('Debug failed:', e);
         Alert.alert('Debug Failed', 'Check console for details.', [{ text: 'OK' }]);
       } finally {
         setLocalLoading(false);

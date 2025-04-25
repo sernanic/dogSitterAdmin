@@ -10,7 +10,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY; // Should be service role key for this script
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('Error: SUPABASE_URL and SUPABASE_KEY must be set in the .env file');
+  console.log('Error: SUPABASE_URL and SUPABASE_KEY must be set in the .env file');
   process.exit(1);
 }
 
@@ -64,7 +64,7 @@ async function createSitterUnavailabilityTable() {
     });
     
     if (error) {
-      console.error('Error creating sitter_unavailability table:', error);
+      console.log('Error creating sitter_unavailability table:', error);
       return false;
     }
     
@@ -77,14 +77,14 @@ async function createSitterUnavailabilityTable() {
     });
     
     if (indexError) {
-      console.error('Error creating index for sitter_unavailability:', indexError);
+      console.log('Error creating index for sitter_unavailability:', indexError);
       return false;
     }
     
     console.log('Successfully created sitter_unavailability table and index.');
     return true;
   } catch (err) {
-    console.error('Exception creating sitter_unavailability table:', err);
+    console.log('Exception creating sitter_unavailability table:', err);
     return false;
   }
 }
@@ -101,7 +101,7 @@ async function main() {
     if (created) {
       console.log('Successfully created sitter_unavailability table!');
     } else {
-      console.error('Failed to create sitter_unavailability table.');
+      console.log('Failed to create sitter_unavailability table.');
       console.log('\nPlease run the SQL script manually:');
       console.log('1. Log into your Supabase dashboard');
       console.log('2. Go to the SQL Editor');
@@ -113,6 +113,6 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error('Fatal error:', err);
+  console.log('Fatal error:', err);
   process.exit(1);
 }); 

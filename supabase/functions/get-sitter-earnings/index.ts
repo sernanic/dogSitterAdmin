@@ -47,7 +47,7 @@ serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
-      console.error('User auth error:', userError);
+      console.log('User auth error:', userError);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401,
@@ -118,7 +118,7 @@ serve(async (req: Request) => {
     });
 
   } catch (error) {
-    console.error('Internal Server Error:', error);
+    console.log('Internal Server Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

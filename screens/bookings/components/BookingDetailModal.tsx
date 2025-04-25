@@ -50,7 +50,7 @@ const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
         router.push({ pathname: '/messages/conversation', params: { recipientId: owner.id } });
         onClose(); // Close modal after navigating
     } else {
-        console.error("Cannot message owner: Owner data not available.");
+        console.log("Cannot message owner: Owner data not available.");
         // Optionally show an alert to the user
     }
   };

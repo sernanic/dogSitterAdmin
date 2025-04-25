@@ -77,7 +77,7 @@ const BoardingRatesModal: React.FC<BoardingRatesModalProps> = ({
         });
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.log('Error:', error);
       setError('Failed to load rates. Please try again.');
     } finally {
       setLoading(false);
@@ -153,7 +153,7 @@ const BoardingRatesModal: React.FC<BoardingRatesModalProps> = ({
       }, 2000);
       
     } catch (error) {
-      console.error('Error updating rates:', error);
+      console.log('Error updating rates:', error);
       setError('Failed to update rates. Please try again.');
     } finally {
       setIsSubmitting(false);

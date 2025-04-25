@@ -184,7 +184,7 @@ const AvailabilityManager = ({
       setSelectedBoardingDates(newDates);
       updateCalendarMarks(newDates);
     } catch (error) {
-      console.error('Error selecting date:', error);
+      console.log('Error selecting date:', error);
       Alert.alert('Error', 'Failed to select date. Please try again.');
     }
   };
@@ -426,7 +426,7 @@ const AvailabilityManager = ({
         onAvailabilityUpdated();
       }
     } catch (error) {
-      console.error("Error saving availability:", error);
+      console.log("Error saving availability:", error);
       Alert.alert(
         "Error",
         "Failed to save your availability. Please try again.",

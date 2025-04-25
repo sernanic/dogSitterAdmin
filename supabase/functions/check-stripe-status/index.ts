@@ -130,7 +130,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error in check-stripe-status function:", error);
+    console.log("Error in check-stripe-status function:", error);
     
     // If the error is about the account not existing, handle gracefully
     if (error.type === 'StripeInvalidRequestError' && error.code === 'resource_missing') {

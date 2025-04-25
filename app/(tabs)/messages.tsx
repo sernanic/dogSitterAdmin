@@ -174,7 +174,7 @@ export default function MessagesScreen() {
       setMessageThreads(data);
       setFilteredThreads(data);
     } catch (error) {
-      console.error('Error fetching message threads:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('Error fetching message threads:', error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -215,7 +215,7 @@ export default function MessagesScreen() {
         });
       }
     } catch (error) {
-      console.error('Error handling realtime update:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('Error handling realtime update:', error instanceof Error ? error.message : 'Unknown error');
     }
   };
 

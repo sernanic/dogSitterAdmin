@@ -124,7 +124,7 @@ export default function ConversationScreen() {
           }
         }
       } catch (error) {
-        console.error('Error loading conversation:', error instanceof Error ? error.message : 'Unknown error');
+        console.log('Error loading conversation:', error instanceof Error ? error.message : 'Unknown error');
       } finally {
         setLoading(false);
       }
@@ -157,7 +157,7 @@ export default function ConversationScreen() {
                 .then(() => {
                   console.log('Message marked as read');
                 }, (err: Error) => {
-                  console.error('Error marking message as read:', 
+                  console.log('Error marking message as read:', 
                     err instanceof Error ? err.message : 'Unknown error');
                 });
             }
@@ -238,7 +238,7 @@ export default function ConversationScreen() {
       console.log('Sending notification to recipient on user app with project ID: ed6daab7-82d1-4660-aa08-8ab0f87dd6fa');
       console.log('Recipient ID:', thread.owner_id);
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.log('Error sending message:', error);
       setError('Failed to send message. Please try again.');
     } finally {
       setSending(false);

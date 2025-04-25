@@ -42,7 +42,7 @@ const UnavailabilityManager = ({ onUnavailabilityUpdated }: { onUnavailabilityUp
           console.log('UnavailabilityManager: Unavailability data loaded successfully');
         })
         .catch(err => {
-          console.error('UnavailabilityManager: Error loading unavailability data', err);
+          console.log('UnavailabilityManager: Error loading unavailability data', err);
         });
     } else {
       console.warn('UnavailabilityManager: No user ID available for fetching unavailability');
@@ -83,7 +83,7 @@ const UnavailabilityManager = ({ onUnavailabilityUpdated }: { onUnavailabilityUp
   // Keep the save function as it interacts with the store
   const handleSaveUnavailability = async () => {
     if (!user?.id) {
-      console.error('UnavailabilityManager: No user ID found for saving');
+      console.log('UnavailabilityManager: No user ID found for saving');
       Alert.alert('Error', 'User ID not found. Please log in again.');
       return;
     }
@@ -102,11 +102,11 @@ const UnavailabilityManager = ({ onUnavailabilityUpdated }: { onUnavailabilityUp
           onUnavailabilityUpdated();
         }
       } else {
-        console.error('UnavailabilityManager: Save operation failed');
+        console.log('UnavailabilityManager: Save operation failed');
         Alert.alert('Error', 'Failed to save your unavailability data.');
       }
     } catch (error) {
-      console.error('UnavailabilityManager: Error saving unavailability', error);
+      console.log('UnavailabilityManager: Error saving unavailability', error);
       Alert.alert('Error', 'Failed to save your unavailability data.');
     } finally {
       setIsSaving(false);

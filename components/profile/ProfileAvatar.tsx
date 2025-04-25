@@ -48,7 +48,7 @@ const ProfileAvatar = ({
               setIsImageLoading(false);
             }}
             onError={() => {
-              console.error("Failed to load avatar");
+              console.log("Failed to load avatar");
               setImageError(true);
               setIsImageLoading(false);
             }}

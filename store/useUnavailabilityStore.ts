@@ -54,7 +54,7 @@ export const useUnavailabilityStore = create<UnavailabilityState>((set, get) => 
       console.log('[useUnavailabilityStore] State updated, isLoading set to false');
       
     } catch (error) {
-      console.error('[useUnavailabilityStore] Fetch error:', error);
+      console.log('[useUnavailabilityStore] Fetch error:', error);
       set({ 
         error: 'Failed to load your unavailability data. Please try again.',
         isLoading: false,
@@ -82,7 +82,7 @@ export const useUnavailabilityStore = create<UnavailabilityState>((set, get) => 
       
       return true;
     } catch (error) {
-      console.error('Failed to save unavailability', error);
+      console.log('Failed to save unavailability', error);
       set({ 
         error: 'Failed to save your unavailability data. Please try again.',
         isLoading: false

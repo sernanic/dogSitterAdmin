@@ -44,7 +44,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         timeoutRef.current = null;
       }
     } catch (error) {
-      console.error('Error refreshing session:', error);
+      console.log('Error refreshing session:', error);
       setInitError(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsInitializing(false);

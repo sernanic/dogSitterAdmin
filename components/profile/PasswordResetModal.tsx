@@ -66,7 +66,7 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
         Alert.alert('Email Sent', 'Password reset email has been sent to your inbox.');
       }
     } catch (err: any) {
-      console.error('Password reset error:', err);
+      console.log('Password reset error:', err);
       setError(err.message || 'Failed to send password reset email. Please try again.');
     } finally {
       setIsSubmitting(false);

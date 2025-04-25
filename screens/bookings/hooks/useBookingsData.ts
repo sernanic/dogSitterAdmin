@@ -10,7 +10,7 @@ const formatDate = (dateString: string): string => {
     const date = parseISO(dateString);
     return format(date, 'PPP'); // e.g., "Jul 21, 2024"
   } catch (error) {
-    console.error("Error formatting date:", error);
+    console.log("Error formatting date:", error);
     return "Invalid Date";
   }
 };
@@ -119,7 +119,7 @@ export const useBookingsData = (statusFilter: UseBookingsDataProps) => {
       setBookings(enrichedBookings);
 
     } catch (err: any) {
-      console.error('Error fetching bookings data:', err);
+      console.log('Error fetching bookings data:', err);
       setError(err.message || 'An unexpected error occurred');
       setBookings([]); // Clear bookings on error
     } finally {
@@ -141,7 +141,7 @@ export const useBookingsData = (statusFilter: UseBookingsDataProps) => {
       console.log('Booking status updated:', data);
       return data; // Return updated booking data if needed
     } catch (err: any) {
-      console.error('Error updating booking status:', err);
+      console.log('Error updating booking status:', err);
       setError(err.message || 'Failed to update booking status');
       return null; // Indicate failure
     }
