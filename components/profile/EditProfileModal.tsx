@@ -22,6 +22,7 @@ interface EditProfileFormData {
   phoneNumber: string;
   location: string;
   avatar_url?: string;
+  background_url?: string;
 }
 
 interface EditProfileModalProps {
@@ -33,6 +34,7 @@ interface EditProfileModalProps {
   isSubmitting: boolean;
   formError: string | null;
   onUploadAvatar: (uri: string) => Promise<void>;
+  onUploadBackground: (uri: string) => Promise<void>;
 }
 
 const EditProfileModal = ({
@@ -43,7 +45,8 @@ const EditProfileModal = ({
   onSubmit,
   isSubmitting,
   formError,
-  onUploadAvatar
+  onUploadAvatar,
+  onUploadBackground
 }: EditProfileModalProps) => {
   
   const handleAvatarPress = async () => {
@@ -116,6 +119,63 @@ const EditProfileModal = ({
       Alert.alert('Error', 'Could not open gallery');
     }
   };
+
+  const handleBackgroundPress = async () => {
+    Alert.alert(
+      "Change Background Image",
+      "Choose a source",
+      [
+        { text: "Take a Photo", onPress: launchBackgroundCamera },
+        { text: "Choose from Gallery", onPress: launchBackgroundImageLibrary },
+        { text: "Cancel", style: "cancel" },
+      ]
+    );
+  };
+
+  const launchBackgroundCamera = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Required", "You need to allow camera access to change your background image.");
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        onUploadBackground(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.log('Error launching camera for background:', error);
+      Alert.alert('Error', 'Could not open camera');
+    }
+  };
+
+  const launchBackgroundImageLibrary = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Required", "You need to allow gallery access to change your background image.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        onUploadBackground(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.log('Error launching image library for background:', error);
+      Alert.alert('Error', 'Could not open gallery');
+    }
+  };
+
   return (
     <Modal
       animationType="slide"
@@ -197,6 +257,22 @@ const EditProfileModal = ({
                   <Text style={styles.helperText}>Enter phone number with country code for best results</Text>
                 </View>
                 
+                <View style={styles.backgroundContainer}>
+                  <TouchableOpacity onPress={handleBackgroundPress}>
+                    {formData.background_url ? (
+                      <Image source={{ uri: formData.background_url }} style={styles.backgroundImage} />
+                    ) : (
+                      <View style={[styles.backgroundImage, styles.backgroundPlaceholder]}>
+                        <Ionicons name="images" size={50} color="#ccc" />
+                      </View>
+                    )}
+                    <TouchableOpacity style={styles.editBackgroundButton} onPress={handleBackgroundPress}>
+                      <Ionicons name="pencil" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                  <Text style={styles.helperText}>Tap to change background image</Text>
+                </View>
+                
               </ScrollView>
               
               <TouchableOpacity
@@ -256,7 +332,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    height: '67%',
+    height: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -314,6 +390,32 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     fontWeight: '600',
+  },
+  backgroundContainer: {
+    marginBottom: 32,
+  },
+  backgroundImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+  },
+  backgroundPlaceholder: {
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editBackgroundButton: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    backgroundColor: '#2563EB',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
   },
 });
 

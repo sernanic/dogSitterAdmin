@@ -72,7 +72,7 @@ export default function Login() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.logoContainer}>
           <Image
-            source={require('../../assets/images/IMG_3648.jpg')}
+            source={require('../../assets/images/pikpupCaregiverIcon.png')}
             style={styles.logo}
           />
         </View>

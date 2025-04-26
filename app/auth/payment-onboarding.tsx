@@ -20,7 +20,7 @@ export default function PaymentOnboardingScreen() {
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.button, styles.secondaryButton, { marginTop: 20 }]} 
-            onPress={() => router.replace('/(tabs)')}
+            onPress={() => router.replace('/auth/location-onboarding')}
           >
             <Text style={styles.secondaryButtonText}>Next</Text>
           </TouchableOpacity>
@@ -31,7 +31,7 @@ export default function PaymentOnboardingScreen() {
         onClose={() => setModalVisible(false)}
         onSetupComplete={() => {
           setModalVisible(false);
-          router.replace('/(tabs)');
+          router.replace('/auth/location-onboarding');
         }}
       />
     </View>

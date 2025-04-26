@@ -8,6 +8,7 @@ export default function AuthLayout() {
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="login" />
       <Stack.Screen name="payment-onboarding" />
+      <Stack.Screen name="location-onboarding" />
     </Stack>
   );
 }

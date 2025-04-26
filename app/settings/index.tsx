@@ -104,13 +104,45 @@ export default function SettingsScreen() {
       
       // Show success message
       if (Platform.OS === 'android') {
-        ToastAndroid.show('Profile picture updated!', ToastAndroid.SHORT);
+        ToastAndroid.show('Profile picture updated successfully!', ToastAndroid.SHORT);
       } else {
-        Alert.alert('Success', 'Profile picture updated!');
+        Alert.alert('Success', 'Profile picture updated successfully!');
       }
     } catch (error) {
-      console.error('Error uploading avatar:', error);
-      Alert.alert('Error', 'Could not update profile picture. Please try again.');
+      console.log('Error uploading avatar:', error);
+      Alert.alert('Error', 'Could not update profile picture');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle background upload
+  const handleBackgroundUpload = async (uri: string) => {
+    try {
+      setIsSubmitting(true);
+      
+      if (!user) {
+        throw new Error('User not found');
+      }
+      
+      // Use the updateBackground function from auth store
+      const backgroundUrl = await useAuthStore.getState().updateBackground(uri);
+      
+      // Update form data with new background URL
+      setEditProfileForm(prev => ({
+        ...prev,
+        background_url: backgroundUrl
+      }));
+      
+      // Show success message
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Background image updated successfully!', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Success', 'Background image updated successfully!');
+      }
+    } catch (error) {
+      console.log('Error uploading background:', error);
+      Alert.alert('Error', 'Could not update background image');
     } finally {
       setIsSubmitting(false);
     }
@@ -400,6 +432,7 @@ export default function SettingsScreen() {
         isSubmitting={isSubmitting}
         formError={formError}
         onUploadAvatar={handleAvatarUpload}
+        onUploadBackground={handleBackgroundUpload}
       />
       
       {/* Address Manager Modal */}

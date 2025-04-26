@@ -3,7 +3,7 @@ export default {
   slug: "pikpup",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/icon.png",
+  icon: "./assets/images/pikpupCaregiverIcon.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
   splash: {
@@ -17,6 +17,7 @@ export default {
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.nicolasserna.pikpup",
+    icon: "./assets/images/pikpupCaregiverIcon.png",
     infoPlist: {
       NSPhotoLibraryUsageDescription: "Allow pikpup to access your photos to update your profile picture",
       NSCameraUsageDescription: "Allow pikpup to access your camera to take profile pictures"
@@ -24,7 +25,7 @@ export default {
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/adaptive-icon.png",
+      foregroundImage: "./assets/images/pikpupCaregiverIcon.png",
       backgroundColor: "#ffffff"
     },
     permissions: [

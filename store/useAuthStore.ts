@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase, upsertProfile, getProfileById, uploadAvatar, updateAvatarUrl } from '../lib/supabase';
+import { supabase, upsertProfile, getProfileById, uploadAvatar, updateAvatarUrl, uploadProfileBackground, updateBackgroundUrl } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js'; // Import Session type
 
 export type UserRole = 'sitter';
@@ -31,6 +31,7 @@ export interface AuthState {
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => Promise<void>;
   updateAvatar: (avatarUri: string) => Promise<string>;
+  updateBackground: (backgroundUri: string) => Promise<string>;
   refreshSession: () => Promise<void>;
   initializeAuthListener: () => void;
 }
@@ -342,6 +343,50 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(`Failed to update profile picture: ${error.message}`);
           } else {
             throw new Error('Failed to update profile picture');
+          }
+        }
+      },
+      
+      updateBackground: async (backgroundUri: string) => {
+        const currentUser = get().user;
+        
+        if (!currentUser) {
+          throw new Error('No authenticated user');
+        }
+        
+        // Set upload in progress
+        set({ isUploading: true });
+        
+        try {
+          console.log('Starting background update with URI:', backgroundUri);
+          
+          // Upload background to Supabase storage
+          const publicUrl = await uploadProfileBackground(currentUser.id, backgroundUri);
+          
+          console.log('Background uploaded, updating profile with URL:', publicUrl);
+          
+          // Update profile with new background URL
+          await updateBackgroundUrl(currentUser.id, publicUrl);
+
+          console.log('Profile updated with new background URL');
+
+          // Update local state
+          set((state) => ({
+            user: state.user ? { ...state.user, background_url: publicUrl } : null,
+            isUploading: false
+          }));
+          
+          return publicUrl;
+        } catch (error) {
+          console.log('Update background failed:', error);
+          // Reset uploading state on error
+          set({ isUploading: false });
+          
+          // Rethrow with a more user-friendly message
+          if (error instanceof Error) {
+            throw new Error(`Failed to update background image: ${error.message}`);
+          } else {
+            throw new Error('Failed to update background image');
           }
         }
       },

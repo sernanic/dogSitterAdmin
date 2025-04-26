@@ -569,6 +569,7 @@ export default function ProfileScreen() {
           isSubmitting={isSubmitting}
           formError={formError}
           onUploadAvatar={handleAvatarUpload}
+          onUploadBackground={handleBackgroundUpload}
         />
       </SafeAreaView>
     </ProtectedRoute>

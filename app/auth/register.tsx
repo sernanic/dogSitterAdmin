@@ -15,6 +15,7 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   
   const register = useAuthStore(state => state.register);
+  const refreshSession = useAuthStore(state => state.refreshSession);
 
   const handleRegister = async () => {
     // Basic validation
@@ -40,13 +41,14 @@ export default function Register() {
       
       // Register the user - this has been simplified to work with Supabase's RLS
       await register(name, email, password);
+      await refreshSession();
       
       // Get the current auth state
       const isAuthenticated = useAuthStore.getState().isAuthenticated;
       
       if (isAuthenticated) {
         // Successfully registered and authenticated
-        router.replace('/auth/payment-onboarding');
+        router.replace('/auth/profile-onboarding');
       } else {
         // Email confirmation required
         console.log('Email confirmation required, redirecting to login screen');
@@ -94,7 +96,7 @@ export default function Register() {
         
         <View style={styles.logoContainer}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=200&auto=format&fit=crop' }}
+            source={require('../../assets/images/pikpupCaregiverIcon.png')}
             style={styles.logo}
           />
           <Text style={styles.appName}>pikpup</Text>

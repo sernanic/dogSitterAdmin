@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useState, useCallback, useRef } from 'react';
+import React, { ReactNode, useEffect, useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { router, usePathname } from 'expo-router';
 import { View } from 'react-native';
@@ -77,17 +77,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [initAuth, refreshSession]);
 
-  // Handle redirects based on auth state
-  useEffect(() => {
-    if (isInitializing) return;
-
-    // Skip redirection if already on an auth path
-    if (pathname.startsWith('/auth')) {
-      return;
-    }
-    
-    // Redirect to login if not authenticated
-    if (!isAuthenticated) {
+  // Immediate route guard before rendering protected routes
+  useLayoutEffect(() => {
+    if (!isInitializing && !pathname.startsWith('/auth') && !isAuthenticated) {
       router.replace('/auth');
     }
   }, [isInitializing, isAuthenticated, pathname]);
