@@ -28,7 +28,7 @@ export default function AvailabilityOnboardingScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.secondaryButton, { marginTop: 20 }]}
-            onPress={() => router.replace('/(tabs)')}
+            onPress={() => router.replace('/auth/services-onboarding')}
           >
             <Text style={styles.secondaryButtonText}>Next</Text>
           </TouchableOpacity>
