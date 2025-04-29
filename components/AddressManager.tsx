@@ -358,10 +358,10 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#62C6B9',
   },
   primaryAddress: {
-    borderColor: '#007AFF',
+    borderColor: '#62C6B9',
     borderWidth: 2,
   },
   addressContent: {
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   primaryBadge: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#62C6B9',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     flexDirection: 'row',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#62C6B9',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#62C6B9',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',

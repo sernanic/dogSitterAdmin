@@ -233,10 +233,29 @@ export default function ConversationScreen() {
         }, 100);
       }
 
-      // Here you would trigger a notification to the recipient on the user app
-      // This is a placeholder - in a real app, this would be handled by your backend
-      console.log('Sending notification to recipient on user app with project ID: ed6daab7-82d1-4660-aa08-8ab0f87dd6fa');
-      console.log('Recipient ID:', thread.owner_id);
+      // Trigger the send-notifications function after successful message insertion
+      if (messageData && thread) {
+        // The backend function expects a payload similar to a DB webhook
+        const payload = {
+          type: 'INSERT',
+          table: 'messages',
+          schema: 'public',
+          record: messageData,
+          old_record: null // No old record for an INSERT event
+        };
+
+        // Asynchronously invoke the function, don't wait for the response
+        supabase.functions.invoke('send-notifications', { body: payload })
+          .then(({ data, error }) => {
+            if (error) {
+              console.error('Error invoking send-notifications function:', error);
+              // Optionally inform the user, but usually notification errors are silent
+            }
+          })
+          .catch(invokeError => {
+            console.error('Exception invoking send-notifications function:', invokeError);
+          });
+      }
     } catch (error) {
       console.log('Error sending message:', error);
       setError('Failed to send message. Please try again.');

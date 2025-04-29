@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   Platform,
   ToastAndroid,
-  TextInput
+  TextInput,
+  KeyboardAvoidingView,
+  ScrollView
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import { supabase, getSitterInfo, updateWalkingRates } from '../../lib/supabase';
@@ -182,10 +184,15 @@ const WalkingRatesModal: React.FC<WalkingRatesModalProps> = ({
       visible={isVisible}
       onRequestClose={handleClose}
     >
-      <View style={styles.centeredView}>
-        <View style={styles.modalView}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Walking Rates</Text>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 120} // Increased Android offset
+      >
+        <ScrollView contentContainerStyle={styles.scrollViewContent}>
+          <View style={styles.modalView}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Walking Rates 1233</Text>
             <TouchableOpacity onPress={handleClose}>
               <X size={24} color="#333" />
             </TouchableOpacity>
@@ -259,28 +266,35 @@ const WalkingRatesModal: React.FC<WalkingRatesModalProps> = ({
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <Text style={styles.buttonText}>Update Rates</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  centeredView: {
+  keyboardAvoidingView: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'center', // Center the modal vertically
+    alignItems: 'center',     // Center the modal horizontally
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Dim background
+  },
+  scrollViewContent: {
+    flexGrow: 1, // Ensure ScrollView content can grow
+    justifyContent: 'center', // Center content within ScrollView
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: '100%', // Ensure ScrollView takes full width for centering modalView
   },
   modalView: {
     backgroundColor: 'white',
     borderRadius: 15,
-    width: '90%',
-    maxWidth: 500,
+    width: '80%',
+    maxWidth: 400,
     paddingVertical: 20,
     paddingHorizontal: 25,
     shadowColor: '#000',

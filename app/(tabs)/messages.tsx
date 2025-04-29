@@ -8,8 +8,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/context/auth';
 import { useAuthStore } from '@/store/useAuthStore';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { setupNotificationListeners } from '@/services/notificationService';
-import * as Notifications from 'expo-notifications';
 
 type MessageThread = {
   id: string;
@@ -53,36 +51,7 @@ export default function MessagesScreen() {
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
   };
 
-  useEffect(() => {
-    // Setup notification listeners
-    let unsubscribe: (() => void) | undefined;
-    const setupListeners = async () => {
-      unsubscribe = await setupNotificationListeners(
-        (notification) => {
-          console.log('Notification received:', notification);
-          // You could update the UI or trigger a refresh when a notification is received
-          if (notification.request.content.data?.type === 'message') {
-            // Refresh message threads
-            if (isAuthenticated && user) {
-              fetchMessageThreads();
-            }
-          }
-        },
-        (response) => {
-          console.log('Notification response:', response);
-          // Navigate to the appropriate conversation if tapped
-          if (response.notification.request.content.data?.threadId) {
-            router.push(`/conversation/${response.notification.request.content.data.threadId}`);
-          }
-        }
-      );
-    };
-    setupListeners();
-    
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [isAuthenticated, user]);
+  
 
   useEffect(() => {
     // If not authenticated, stop loading and return early

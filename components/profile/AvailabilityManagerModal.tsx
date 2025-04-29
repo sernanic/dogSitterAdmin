@@ -10,7 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
-  ScrollView
+  FlatList
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AvailabilityManager from './AvailabilityManager';
@@ -255,7 +255,7 @@ const AvailabilityManagerModal = ({
   const showEmptyView = () => {
     return (
       <View style={styles.emptyContainer}>
-        <MaterialIcons name="event-available" size={64} color="#007AFF" />
+        <MaterialIcons name="event-available" size={64} color="#62C6B9" />
         <Text style={styles.emptyTitle}>No Availability Set</Text>
         <Text style={styles.emptyDescription}>
           {activeTab === 'walking' ? 
@@ -291,7 +291,7 @@ const AvailabilityManagerModal = ({
           <MaterialIcons 
             name="directions-walk" 
             size={24} 
-            color={activeTab === 'walking' ? "#007AFF" : "#777"} 
+            color={activeTab === 'walking' ? "#62C6B9" : "#777"} 
           />
           <Text style={[styles.tabText, activeTab === 'walking' && styles.activeTabText]}>
             Walking
@@ -305,7 +305,7 @@ const AvailabilityManagerModal = ({
           <MaterialIcons 
             name="home" 
             size={24} 
-            color={activeTab === 'boarding' ? "#007AFF" : "#777"} 
+            color={activeTab === 'boarding' ? "#62C6B9" : "#777"} 
           />
           <Text style={[styles.tabText, activeTab === 'boarding' && styles.activeTabText]}>
             Boarding
@@ -343,7 +343,7 @@ const AvailabilityManagerModal = ({
           <SafeAreaView style={styles.container}>
             {isLoading && !forceShowEmpty && activeTab === 'walking' ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color="#62C6B9" />
                 <Text style={styles.loadingText}>Loading your walking availability...</Text>
                 
                 <TouchableOpacity 
@@ -355,7 +355,7 @@ const AvailabilityManagerModal = ({
               </View>
             ) : loadingBoardingDates && !forceShowEmpty && activeTab === 'boarding' ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color="#62C6B9" />
                 <Text style={styles.loadingText}>Loading your boarding availability...</Text>
                 
                 <TouchableOpacity 
@@ -394,24 +394,40 @@ const AvailabilityManagerModal = ({
               </View>
             ) : (
               <View style={styles.contentContainer}>
-                {renderTabs()}
-                
-                {shouldShowEmptyState ? (
-                  showEmptyView()
+                {activeTab === 'boarding' ? (
+                  <FlatList
+                    data={[{}]}
+                    keyExtractor={(_, i) => i.toString()}
+                    contentContainerStyle={{ flexGrow: 1 }}
+                    showsVerticalScrollIndicator={false}
+                    ListHeaderComponent={() => (
+                      <>
+                        {renderTabs()}
+                        {shouldShowEmptyState ? (
+                          showEmptyView()
+                        ) : (
+                          <AvailabilityManager
+                            onAvailabilityUpdated={handleAvailabilityUpdated}
+                            mode="boarding"
+                            boardingDates={boardingDates}
+                            onBoardingDatesChanged={saveBoardingAvailability}
+                          />
+                        )}
+                      </>
+                    )}
+                  />
                 ) : (
-                  activeTab === 'walking' ? (
-                    <AvailabilityManager 
-                      onAvailabilityUpdated={handleAvailabilityUpdated} 
-                      mode="walking"
-                    />
-                  ) : (
-                    <AvailabilityManager 
-                      onAvailabilityUpdated={handleAvailabilityUpdated}
-                      mode="boarding"
-                      boardingDates={boardingDates}
-                      onBoardingDatesChanged={saveBoardingAvailability}
-                    />
-                  )
+                  <>
+                    {renderTabs()}
+                    {shouldShowEmptyState ? (
+                      showEmptyView()
+                    ) : (
+                      <AvailabilityManager
+                        onAvailabilityUpdated={handleAvailabilityUpdated}
+                        mode="walking"
+                      />
+                    )}
+                  </>
                 )}
               </View>
             )}
@@ -463,7 +479,7 @@ const styles = StyleSheet.create({
     color: '#777',
   },
   activeTabText: {
-    color: '#007AFF',
+    color: '#62C6B9',
   },
   contentContainer: {
     flex: 1,
@@ -538,7 +554,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#62C6B9',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,

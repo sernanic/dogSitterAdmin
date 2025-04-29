@@ -148,7 +148,7 @@ const AvailabilityManager = ({
       const dateStr = format(date, 'yyyy-MM-dd');
       markedDates[dateStr] = {
         selected: true,
-        selectedColor: '#007AFF',
+        selectedColor: '#62C6B9',
       };
     });
     
@@ -158,7 +158,8 @@ const AvailabilityManager = ({
   // Handle boarding date selection
   const handleDateSelect = async (date: any) => {
     try {
-      const selectedDate = new Date(date.dateString);
+      const [year, month, day] = date.dateString.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day);
       
       // Check if date is already in unavailability table
       if (user?.id) {
@@ -638,9 +639,9 @@ const AvailabilityManager = ({
           onDayPress={handleDateSelect}
           markedDates={calendarMarkedDates}
           theme={{
-            selectedDayBackgroundColor: '#007AFF',
+            selectedDayBackgroundColor: '#62C6B9',
             selectedDayTextColor: '#ffffff',
-            todayTextColor: '#007AFF',
+            todayTextColor: '#62C6B9',
             textDayFontWeight: '400',
             textMonthFontWeight: 'bold',
             textDayHeaderFontWeight: '400',
@@ -654,7 +655,7 @@ const AvailabilityManager = ({
         
         <View style={styles.calendarLegend}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#007AFF' }]} />
+            <View style={[styles.legendDot, { backgroundColor: '#62C6B9' }]} />
             <Text style={styles.legendText}>Available for Boarding</Text>
           </View>
           <View style={styles.legendItem}>
@@ -839,7 +840,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   predefinedSlotText: {
-    color: '#0070f3',
+    color: '#62C6B9',
     fontSize: 14,
   },
   timeSlotsContainer: {
@@ -855,7 +856,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     flexDirection: 'row',
-    backgroundColor: '#0070f3',
+    backgroundColor: '#62C6B9',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -908,7 +909,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   saveButton: {
-    backgroundColor: '#0070f3',
+    backgroundColor: '#62C6B9',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -9,7 +9,11 @@ import {
   ActivityIndicator,
   Platform,
   ToastAndroid,
-  TextInput
+  TextInput,
+  ScrollView,
+  Keyboard,
+  Animated,
+  Dimensions
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import { supabase, getSitterInfo, updateBoardingRates } from '../../lib/supabase';
@@ -31,6 +35,8 @@ const BoardingRatesModal: React.FC<BoardingRatesModalProps> = ({
   onClose,
   onRatesUpdated
 }) => {
+  const modalPosition = useRef(new Animated.Value(0)).current;
+  const { height } = Dimensions.get('window');
   const [rates, setRates] = useState<BoardingRates>({
     ratePerDay: '',
     rateForAdditionalDog: '',
@@ -41,6 +47,37 @@ const BoardingRatesModal: React.FC<BoardingRatesModalProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
+  // Keyboard listeners setup and modal position animation
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        const keyboardHeight = e.endCoordinates.height;
+        Animated.timing(modalPosition, {
+          toValue: -keyboardHeight / 2,  // Move modal up half the keyboard height
+          duration: 250,
+          useNativeDriver: true
+        }).start();
+      }
+    );
+    
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        Animated.timing(modalPosition, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true
+        }).start();
+      }
+    );
+    
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
+
   // Load current rates when modal opens
   useEffect(() => {
     if (isVisible) {
@@ -177,15 +214,26 @@ const BoardingRatesModal: React.FC<BoardingRatesModalProps> = ({
   
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       transparent={true}
       visible={isVisible}
       onRequestClose={handleClose}
     >
-      <View style={styles.centeredView}>
-        <View style={styles.modalView}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Boarding Rates</Text>
+      <View style={styles.modalContainer}>
+        <Animated.View 
+          style={[
+            styles.animatedContainer,
+            { transform: [{ translateY: modalPosition }] }
+          ]}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.scrollViewContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+          <View style={styles.modalView}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Boarding Rates</Text>
             <TouchableOpacity onPress={handleClose}>
               <X size={24} color="#333" />
             </TouchableOpacity>
@@ -259,28 +307,43 @@ const BoardingRatesModal: React.FC<BoardingRatesModalProps> = ({
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <Text style={styles.buttonText}>Update Rates</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+          </ScrollView>
+        </Animated.View>
       </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  centeredView: {
+  modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
+  animatedContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    maxHeight: Dimensions.get('window').height * 0.85, // Limit modal height
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 20,
+  },
   modalView: {
     backgroundColor: 'white',
     borderRadius: 15,
-    width: '90%',
-    maxWidth: 500,
+    width: '80%',
+    maxWidth: 400,
     paddingVertical: 20,
     paddingHorizontal: 25,
     shadowColor: '#000',

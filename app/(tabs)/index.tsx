@@ -6,7 +6,6 @@ import { supabase, getSitterStats, getSitterEarnings, SitterStats, SitterEarning
 import { format, parseISO } from 'date-fns';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
-import { initializeNotifications } from '@/services/notificationService';
 
 // Interfaces for data types
 interface Pet {
@@ -169,19 +168,7 @@ export default function HomeScreen() {
     }
   }, [isAuthenticated, user]);
 
-  useEffect(() => {
-    if (user) {
-      // Initialize notifications
-      initializeNotifications(user.id, 'sitter').then(token => {
-        if (token) {
-          // Token is stored in Supabase by the initializeNotifications function
-          console.log('Notification token ready:', token);
-        }
-      }).catch(err => {
-        console.log('Error initializing notifications:', err);
-      });
-    }
-  }, [user]);
+
 
   // Function to fetch upcoming bookings
   const fetchUpcomingBookings = async () => {

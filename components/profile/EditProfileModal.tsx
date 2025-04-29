@@ -190,7 +190,7 @@ const EditProfileModal = ({
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Edit Profile</Text>
                 <TouchableOpacity onPress={onClose}>
-                  <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color="#62C6B9" />
                 </TouchableOpacity>
               </View>
               
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     bottom: 0,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#62C6B9',
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -343,6 +343,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#62C6B9',
   },
   errorContainer: {
     backgroundColor: '#FFEBEE',
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
   submitButton: {
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#62C6B9',
     alignItems: 'center',
   },
   disabledButton: {
@@ -408,7 +409,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 8,
     bottom: 8,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#62C6B9',
     width: 32,
     height: 32,
     borderRadius: 16,
