@@ -407,13 +407,13 @@ export const deleteAccount = async (userId: string): Promise<void> => {
   try {
     console.log('Starting account deletion process for user:', userId);
     
-    // 1. Delete related data first (before auth record is gone)
+    // 1. Delete related data first
     // Delete portfolio images if they exist
     try {
       const { error: portfolioError } = await supabase
         .from('portfolio_images')
         .delete()
-        .eq('profile_id', userId);
+        .eq('sitter_id', userId);
       
       if (!portfolioError) {
         console.log('Successfully deleted portfolio images');
@@ -434,18 +434,7 @@ export const deleteAccount = async (userId: string): Promise<void> => {
       console.log('Successfully deleted addresses');
     }
     
-    // 2. Delete the user's auth record using the admin API
-    const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-    
-    if (authError) {
-      console.error('Error deleting user auth record:', authError);
-      throw authError;
-    }
-    
-    console.log('Successfully deleted user auth record');
-    
-    // 3. Delete profile data as a final cleanup
-    // This might not be necessary if RLS policies cascade delete when auth is removed
+    // Delete profile data
     try {
       const { error: profileError } = await supabase
         .from('profiles')
@@ -454,15 +443,33 @@ export const deleteAccount = async (userId: string): Promise<void> => {
       
       if (!profileError) {
         console.log('Successfully deleted profile record');
+      } else {
+        console.error('Error deleting profile record:', profileError);
       }
     } catch (err) {
-      console.log('Profile may have been auto-deleted by RLS policy');
+      console.error('Error during profile deletion:', err);
     }
     
-    // 4. Sign out current session
-    await supabase.auth.signOut();
+    // 2. Delete or deactivate user-generated content
+    // Note: Add here any other tables that need cleaning up
     
-    console.log('Account deletion completed');
+    // 3. Since we can't delete the auth record from client side,
+    // sign out the user which effectively revokes their session
+    const { error: signOutError } = await supabase.auth.signOut();
+    
+    if (signOutError) {
+      console.error('Error signing out:', signOutError);
+    } else {
+      console.log('User signed out successfully');
+    }
+    
+    console.log('Account data deletion completed');
+    
+    // 4. Display information to the user
+    // Let them know that while their data has been deleted,
+    // they may need to contact support to completely delete their account
+    // This message should be handled by the UI, not here in the function
+    
   } catch (error) {
     console.error('Error during account deletion:', error);
     throw error;

@@ -440,7 +440,7 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity onPress={() => router.push('/settings/')}>
+          <TouchableOpacity onPress={() => router.push('/settings')}>
             <Settings size={24} color="#333" />
           </TouchableOpacity>
         </View>

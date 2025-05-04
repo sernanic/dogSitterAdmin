@@ -18,8 +18,11 @@ export default {
     buildNumber: "4.0.0", 
     icon: "./assets/images/pikpupCaregiverIcon.png", 
     infoPlist: {
-      NSPhotoLibraryUsageDescription: "Allow pikpup to access your photos to update your profile picture",
-      NSCameraUsageDescription: "Allow pikpup to access your camera to take profile pictures",
+      NSPhotoLibraryUsageDescription: "Allow PikPup to access your photos to update your profile picture and portfolio images",
+      NSCameraUsageDescription: "Allow PikPup to access your camera to take profile pictures and portfolio images",
+      NSLocationWhenInUseUsageDescription: "Allow PikPup to access your location to help pet owners find caregivers nearby and accurately set your service address",
+      NSLocationAlwaysUsageDescription: "Allow PikPup to access your location to provide real-time updates during pet sitting sessions and walks",
+      NSUserNotificationsUsageDescription: "Allow PikPup to send you notifications about booking requests, messages from pet owners, and important updates",
       ITSAppUsesNonExemptEncryption: false, 
       "UIBackgroundModes": ["fetch", "remote-notification"]
     },
@@ -35,7 +38,9 @@ export default {
     permissions: [ 
       "CAMERA",
       "READ_EXTERNAL_STORAGE",
-      "WRITE_EXTERNAL_STORAGE"
+      "WRITE_EXTERNAL_STORAGE",
+      "ACCESS_COARSE_LOCATION",
+      "ACCESS_FINE_LOCATION"
     ],
     "intentFilters": [
         {

@@ -379,7 +379,10 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>Good morning,</Text>
             <Text style={styles.name}>{user?.name || 'Sitter'}</Text>
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={() => router.push('/notifications')}
+          >
             <Bell size={24} color="#333" />
             <View style={styles.notificationBadge} />
           </TouchableOpacity>
@@ -483,7 +486,10 @@ export default function HomeScreen() {
               <TouchableOpacity 
                 key={booking.id} 
                 style={styles.bookingCard}
-                onPress={() => router.push(`/booking/${booking.id}`)}
+                onPress={() => router.push({
+                  pathname: "/(tabs)/bookings",
+                  params: { id: booking.id }
+                })}
               >
                 {/* Show pet image if available, otherwise use placeholder */}
                 <Image 
