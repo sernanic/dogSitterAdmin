@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
@@ -13,6 +13,12 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Create refs for input fields to manage focus
+  const nameInputRef = useRef<TextInput>(null);
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
   
   const register = useAuthStore(state => state.register);
   const refreshSession = useAuthStore(state => state.refreshSession);
@@ -99,7 +105,7 @@ export default function Register() {
             source={require('../../assets/images/pikpupCaregiverIcon.png')}
             style={styles.logo}
           />
-          <Text style={styles.appName}>pikpup</Text>
+          <Text style={styles.appName}>PikPup</Text>
           <Text style={styles.tagline}>Create your account and start offering pet sitting services</Text>
         </View>
         
@@ -109,18 +115,23 @@ export default function Register() {
           <View style={styles.inputContainer}>
             <User size={20} color="#999" style={styles.inputIcon} />
             <TextInput
+              ref={nameInputRef}
               style={styles.input}
               placeholder="Full Name"
               placeholderTextColor="#999"
+              autoComplete="name"
               value={name}
               onChangeText={setName}
-              autoComplete="name"
+              returnKeyType="next"
+              onSubmitEditing={() => emailInputRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
           
           <View style={styles.inputContainer}>
             <Mail size={20} color="#999" style={styles.inputIcon} />
             <TextInput
+              ref={emailInputRef}
               style={styles.input}
               placeholder="Email Address"
               placeholderTextColor="#999"
@@ -129,12 +140,16 @@ export default function Register() {
               autoComplete="email"
               value={email}
               onChangeText={setEmail}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
           
           <View style={styles.inputContainer}>
             <Lock size={20} color="#999" style={styles.inputIcon} />
             <TextInput
+              ref={passwordInputRef}
               style={styles.input}
               placeholder="Password"
               placeholderTextColor="#999"
@@ -145,6 +160,9 @@ export default function Register() {
               passwordRules="minlength: 6; required: lower; required: upper; required: digit; required: [-];"
               value={password}
               onChangeText={setPassword}
+              returnKeyType="next"
+              onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
+              blurOnSubmit={false}
             />
             <TouchableOpacity 
               onPress={() => setShowPassword(!showPassword)}
@@ -161,6 +179,7 @@ export default function Register() {
           <View style={styles.inputContainer}>
             <Lock size={20} color="#999" style={styles.inputIcon} />
             <TextInput
+              ref={confirmPasswordInputRef}
               style={styles.input}
               placeholder="Confirm Password"
               placeholderTextColor="#999"
@@ -170,6 +189,8 @@ export default function Register() {
               textContentType="newPassword"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
+              returnKeyType="done"
+              onSubmitEditing={handleRegister}
             />
             <TouchableOpacity 
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}

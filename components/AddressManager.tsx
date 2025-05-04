@@ -9,12 +9,14 @@ interface AddressManagerProps {
   onAddressSelected?: (address: Address) => void;
   showAddButton?: boolean;
   showEditButtons?: boolean;
+  onClose?: () => void;
 }
 
 export default function AddressManager({
   onAddressSelected,
   showAddButton = true,
   showEditButtons = true,
+  onClose,
 }: AddressManagerProps) {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
@@ -301,10 +303,9 @@ export default function AddressManager({
           {showAddButton && (
             <TouchableOpacity 
               style={styles.addButton}
-              onPress={() => setIsAddingAddress(true)}
+              onPress={onClose || (() => setIsAddingAddress(true))}
             >
-              <Ionicons name="add" size={20} color="white" style={styles.addIcon} />
-              <Text style={styles.addButtonText}>Add New Address</Text>
+              <Text style={styles.addButtonText}>Done</Text>
             </TouchableOpacity>
           )}
         </>

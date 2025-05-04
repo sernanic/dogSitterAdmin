@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase, upsertProfile, getProfileById, uploadAvatar, updateAvatarUrl, uploadProfileBackground, updateBackgroundUrl } from '../lib/supabase';
+import { supabase, upsertProfile, getProfileById, uploadAvatar, updateAvatarUrl, uploadProfileBackground, updateBackgroundUrl, deleteAccount as deleteAccountFromSupabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js'; // Import Session type
 
 export type UserRole = 'sitter';
@@ -29,6 +29,7 @@ export interface AuthState {
   loginWithSocial: (provider: string) => Promise<void>;
   register: (name: string, email: string, password: string, role?: UserRole) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   updateUser: (userData: Partial<User>) => Promise<void>;
   updateAvatar: (avatarUri: string) => Promise<string>;
   updateBackground: (backgroundUri: string) => Promise<string>;
@@ -256,6 +257,28 @@ export const useAuthStore = create<AuthState>()(
           // DO NOT clear state here anymore, rely on listener or subsequent refresh.
           // Consider if an error here means the user is potentially still logged in on Supabase side.
           throw error; // Re-throw error to be caught by UI
+        }
+      },
+      
+      deleteAccount: async () => {
+        try {
+          const currentUser = get().user;
+          
+          if (!currentUser) {
+            throw new Error('No authenticated user');
+          }
+          
+          console.log('useAuthStore: Initiating account deletion for user:', currentUser.id);
+          
+          // Use the imported deleteAccountFromSupabase function
+          await deleteAccountFromSupabase(currentUser.id);
+          
+          // The deleteAccount function will sign the user out
+          // The auth listener will update the state
+          console.log('useAuthStore: Account deletion completed successfully');
+        } catch (error) {
+          console.error('useAuthStore: Account deletion failed:', error);
+          throw error;
         }
       },
       

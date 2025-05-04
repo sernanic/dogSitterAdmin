@@ -196,7 +196,7 @@ export default function SettingsScreen() {
   // Handle logout
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
+      'Confirm Logout',
       'Are you sure you want to log out?',
       [
         {
@@ -205,24 +205,61 @@ export default function SettingsScreen() {
         },
         {
           text: 'Logout',
+          style: 'destructive',
           onPress: async () => {
             try {
-              // Get logout function directly from the store
-              const logout = useAuthStore.getState().logout;
-              
-              // Log some debugging info
-              console.log('Starting logout process');
-              
-              // Perform the logout
-              await logout();
-              
-              console.log('Logout successful, AuthGuard should handle redirect.');
+              // Show loading state
+              setIsSubmitting(true);
+              // Call logout from auth store
+              await useAuthStore.getState().logout();
             } catch (error) {
-              console.error('Error logging out:', error);
-              Alert.alert('Error', 'Failed to log out. Please try again.');
+              console.error('Logout failed:', error);
+              // Show error message
+              if (Platform.OS === 'android') {
+                ToastAndroid.show('Logout failed', ToastAndroid.SHORT);
+              } else {
+                Alert.alert('Error', 'There was a problem logging out. Please try again.');
+              }
+            } finally {
+              setIsSubmitting(false);
             }
           },
         },
+      ]
+    );
+  };
+  
+  // Handle delete account
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Show loading indicator or disable button
+              setIsSubmitting(true);
+              
+              // Call the delete account method
+              await useAuthStore.getState().deleteAccount();
+              
+              // Router will redirect to login automatically when auth state changes
+              // due to the auth listener in the app
+            } catch (error) {
+              console.error('Error deleting account:', error);
+              Alert.alert(
+                'Error',
+                'There was a problem deleting your account. Please try again later or contact support.',
+                [{ text: 'OK' }]
+              );
+              setIsSubmitting(false);
+            }
+          } 
+        }
       ]
     );
   };
@@ -390,6 +427,22 @@ export default function SettingsScreen() {
               <Text style={styles.settingDescription}>Get help with the app</Text>
             </View>
             <ChevronRight size={20} color="#8E8E93" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Danger Zone Section */}
+        <View style={[styles.section, { borderColor: '#E57373', borderWidth: 1 }]}>
+          
+          <TouchableOpacity 
+            style={{
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onPress={handleDeleteAccount}
+          >
+            <Text style={{ fontSize: 16, fontFamily: 'Inter-Medium', color: '#D32F2F' }}>Delete Account</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.settingItem}>

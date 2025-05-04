@@ -402,6 +402,73 @@ export const getPrimaryAddress = async (profileId: string): Promise<Address | nu
   }
 };
 
+// Helper function to delete a user account and all related data
+export const deleteAccount = async (userId: string): Promise<void> => {
+  try {
+    console.log('Starting account deletion process for user:', userId);
+    
+    // 1. Delete related data first (before auth record is gone)
+    // Delete portfolio images if they exist
+    try {
+      const { error: portfolioError } = await supabase
+        .from('portfolio_images')
+        .delete()
+        .eq('profile_id', userId);
+      
+      if (!portfolioError) {
+        console.log('Successfully deleted portfolio images');
+      }
+    } catch (err) {
+      console.log('No portfolio images found or error deleting them');
+    }
+    
+    // Delete addresses
+    const { error: addressError } = await supabase
+      .from('addresses')
+      .delete()
+      .eq('profile_id', userId);
+      
+    if (addressError) {
+      console.error('Error deleting addresses:', addressError);
+    } else {
+      console.log('Successfully deleted addresses');
+    }
+    
+    // 2. Delete the user's auth record using the admin API
+    const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+    
+    if (authError) {
+      console.error('Error deleting user auth record:', authError);
+      throw authError;
+    }
+    
+    console.log('Successfully deleted user auth record');
+    
+    // 3. Delete profile data as a final cleanup
+    // This might not be necessary if RLS policies cascade delete when auth is removed
+    try {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+      
+      if (!profileError) {
+        console.log('Successfully deleted profile record');
+      }
+    } catch (err) {
+      console.log('Profile may have been auto-deleted by RLS policy');
+    }
+    
+    // 4. Sign out current session
+    await supabase.auth.signOut();
+    
+    console.log('Account deletion completed');
+  } catch (error) {
+    console.error('Error during account deletion:', error);
+    throw error;
+  }
+};
+
 export const upsertAddress = async (address: Partial<Address>): Promise<Address> => {
   try {
     // Prepare the address data for saving

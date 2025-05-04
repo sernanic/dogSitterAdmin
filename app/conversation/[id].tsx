@@ -245,15 +245,15 @@ export default function ConversationScreen() {
         };
 
         // Asynchronously invoke the function, don't wait for the response
-        supabase.functions.invoke('send-notifications', { body: payload })
+        supabase.functions.invoke('send-notification', { body: payload })
           .then(({ data, error }) => {
             if (error) {
-              console.error('Error invoking send-notifications function:', error);
+              console.error('Error invoking send-notification function:', error);
               // Optionally inform the user, but usually notification errors are silent
             }
           })
           .catch(invokeError => {
-            console.error('Exception invoking send-notifications function:', invokeError);
+            console.error('Exception invoking send-notification function:', invokeError);
           });
       }
     } catch (error) {

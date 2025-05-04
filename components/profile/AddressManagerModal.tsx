@@ -44,6 +44,7 @@ const AddressManagerModal = ({
                   onAddressSelected(address);
                   onClose();
                 }}
+                onClose={onClose}
               />
             </View>
           </TouchableWithoutFeedback>

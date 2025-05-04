@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { Link, router } from 'expo-router';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
@@ -10,6 +10,10 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Create refs for input fields to manage focus
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
   
   const login = useAuthStore(state => state.login);
   const loginWithSocial = useAuthStore(state => state.loginWithSocial);
@@ -85,6 +89,7 @@ export default function Login() {
           <View style={styles.inputContainer}>
             <Mail size={20} color="#999" style={styles.inputIcon} />
             <TextInput
+              ref={emailInputRef}
               style={styles.input}
               placeholder="Email Address"
               placeholderTextColor="#999"
@@ -93,12 +98,16 @@ export default function Login() {
               autoComplete="email"
               value={email}
               onChangeText={setEmail}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
           
           <View style={styles.inputContainer}>
             <Lock size={20} color="#999" style={styles.inputIcon} />
             <TextInput
+              ref={passwordInputRef}
               style={styles.input}
               placeholder="Password"
               placeholderTextColor="#999"
@@ -108,6 +117,8 @@ export default function Login() {
               textContentType="password"
               value={password}
               onChangeText={setPassword}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
             />
             <TouchableOpacity 
               onPress={() => setShowPassword(!showPassword)}

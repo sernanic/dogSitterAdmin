@@ -6,7 +6,6 @@ export default {
   icon: "./assets/images/pikpupCaregiverIcon.png", 
   userInterfaceStyle: "light", 
   splash: {
-    image: "./assets/splash.png", 
     resizeMode: "contain",
     backgroundColor: "#ffffff"
   },
@@ -31,7 +30,7 @@ export default {
     package: "com.nicolasserna.pikpup", 
     adaptiveIcon: {
       foregroundImage: "./assets/images/pikpupCaregiverIcon.png", 
-      backgroundColor: "#ffffff"
+      backgroundColor: "#62C6B9"
     },
     permissions: [ 
       "CAMERA",
