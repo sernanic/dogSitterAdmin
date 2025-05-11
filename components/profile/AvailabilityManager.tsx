@@ -129,8 +129,8 @@ const AvailabilityManager = ({
       });
       setDayAvailability(updatedDayAvailability);
     }
-  }, [availability, expandedDay]);
-  
+  }, [availability]);
+
   // Update boardingDates state when passed from props
   useEffect(() => {
     if (boardingDates && mode === 'boarding') {
@@ -191,7 +191,7 @@ const AvailabilityManager = ({
   };
 
   const toggleDay = (day: string) => {
-    setExpandedDay(expandedDay === day ? null : day);
+    setExpandedDay(prev => (prev === day ? null : day));
   };
 
   const addTimeSlot = (day: string, start = '09:00', end = '19:00') => {
