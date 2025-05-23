@@ -83,6 +83,6 @@ export default {
     },
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
-    EXPO_PUBLIC_GOOGLE_PLACES_API_KEY: "AIzaSyDex8KhVir0fRdJ4WCyHrrt91YZrBX9JTk"
+    EXPO_PUBLIC_GOOGLE_PLACES_API_KEY: process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY
   }
 };

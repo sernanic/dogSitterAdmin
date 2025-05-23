@@ -11,6 +11,7 @@ import EventRegister from '../../utils/EventRegister';
 import PasswordChangeModal from '../../components/profile/PasswordChangeModal';
 import WalkingRatesModal from '../../components/profile/WalkingRatesModal';
 import BoardingRatesModal from '../../components/profile/BoardingRatesModal';
+import GroomingRatesModal from '../../components/profile/GroomingRatesModal';
 
 // Import modal components
 import EditProfileModal from '../../components/profile/EditProfileModal';
@@ -19,13 +20,14 @@ import AvailabilityManagerModal from '../../components/profile/AvailabilityManag
 import GroomingAvailabilityManagerModal from '../../components/profile/GroomingAvailabilityManagerModal';
 import UnavailabilityManagerModal from '../../components/profile/UnavailabilityManagerModal';
 import PaymentSetupModal from '../../components/profile/PaymentSetupModal';
-import { getPrimaryAddress, getProfileById } from '../../lib/supabase';
+import { getPrimaryAddress, getProfileById, Profile } from '../../lib/supabase';
 import { SERVICE_TYPES } from '../../constants/serviceTypes';
 
 export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const user = useAuthStore(state => state.user);
   const refreshSession = useAuthStore(state => state.refreshSession);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
   
   // Modal visibility states
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -37,6 +39,7 @@ export default function SettingsScreen() {
   const [isPasswordChangeModalVisible, setIsPasswordChangeModalVisible] = useState(false);
   const [isWalkingRatesModalVisible, setIsWalkingRatesModalVisible] = useState(false);
   const [isBoardingRatesModalVisible, setIsBoardingRatesModalVisible] = useState(false);
+  const [isGroomingRatesModalVisible, setIsGroomingRatesModalVisible] = useState(false);
   
   // Other state variables
   const [primaryAddress, setPrimaryAddress] = useState<any>(null);
@@ -49,10 +52,11 @@ export default function SettingsScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   
-  // Load primary address when component mounts
+  // Load primary address and full user profile when component mounts
   useEffect(() => {
     if (user?.id) {
       loadPrimaryAddress();
+      loadUserProfile();
     }
   }, [user?.id]);
   
@@ -63,6 +67,17 @@ export default function SettingsScreen() {
       setPrimaryAddress(address);
     } catch (error) {
       console.log('Error loading primary address:', error);
+    }
+  };
+  
+  // Load full user profile from Supabase
+  const loadUserProfile = async () => {
+    if (!user?.id) return;
+    try {
+      const profile = await getProfileById(user.id);
+      setUserProfile(profile);
+    } catch (error) {
+      console.error('Error loading user profile in settings:', error);
     }
   };
   
@@ -275,21 +290,23 @@ export default function SettingsScreen() {
   
   // Handle availability manager
   const handleManageAvailability = async () => {
-    try {
-      if (!user?.id) return;
-      
-      // Get user's profile to check service type
-      const profile = await getProfileById(user.id);
-      
-      // Show appropriate modal based on service type
-      if (profile.service_type === SERVICE_TYPES.GROOMING) {
-        setIsGroomingAvailabilityModalVisible(true);
-      } else {
+    let currentServiceType = userProfile?.service_type;
+
+    if (currentServiceType === undefined && user?.id) {
+      try {
+        const profile = await getProfileById(user.id);
+        setUserProfile(profile);
+        currentServiceType = profile.service_type;
+      } catch (error) {
+        console.error('Error fetching profile for availability:', error);
         setIsAvailabilityModalVisible(true);
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      // Default to regular availability modal if there's an error
+    }
+    
+    if (currentServiceType === SERVICE_TYPES.GROOMING) {
+      setIsGroomingAvailabilityModalVisible(true);
+    } else {
       setIsAvailabilityModalVisible(true);
     }
   };
@@ -383,7 +400,7 @@ export default function SettingsScreen() {
             </>
           )}
           
-          {user?.role === 'sitter' && (
+          {user?.role === 'sitter' && userProfile && (
             <>
               <TouchableOpacity 
                 style={styles.settingItem}
@@ -396,27 +413,44 @@ export default function SettingsScreen() {
                 <ChevronRight size={20} color="#8E8E93" />
               </TouchableOpacity>
             
-              <TouchableOpacity 
-                style={styles.settingItem}
-                onPress={() => setIsWalkingRatesModalVisible(true)}
-              >
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Walking Rates</Text>
-                  <Text style={styles.settingDescription}>Set your rates for dog walking</Text>
-                </View>
-                <ChevronRight size={20} color="#8E8E93" />
-              </TouchableOpacity>
-            
-              <TouchableOpacity 
-                style={styles.settingItem}
-                onPress={() => setIsBoardingRatesModalVisible(true)}
-              >
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Boarding Rates</Text>
-                  <Text style={styles.settingDescription}>Set your rates for dog boarding</Text>
-                </View>
-                <ChevronRight size={20} color="#8E8E93" />
-              </TouchableOpacity>
+              {userProfile.service_type === SERVICE_TYPES.WALKING_BOARDING && (
+                <>
+                  <TouchableOpacity 
+                    style={styles.settingItem}
+                    onPress={() => setIsWalkingRatesModalVisible(true)}
+                  >
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingLabel}>Walking Rates</Text>
+                      <Text style={styles.settingDescription}>Set your rates for dog walking</Text>
+                    </View>
+                    <ChevronRight size={20} color="#8E8E93" />
+                  </TouchableOpacity>
+                
+                  <TouchableOpacity 
+                    style={styles.settingItem}
+                    onPress={() => setIsBoardingRatesModalVisible(true)}
+                  >
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingLabel}>Boarding Rates</Text>
+                      <Text style={styles.settingDescription}>Set your rates for dog boarding</Text>
+                    </View>
+                    <ChevronRight size={20} color="#8E8E93" />
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {userProfile.service_type === SERVICE_TYPES.GROOMING && (
+                <TouchableOpacity 
+                  style={styles.settingItem}
+                  onPress={() => setIsGroomingRatesModalVisible(true)}
+                >
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingLabel}>Grooming Rates</Text>
+                    <Text style={styles.settingDescription}>Set your rates for grooming services</Text>
+                  </View>
+                  <ChevronRight size={20} color="#8E8E93" />
+                </TouchableOpacity>
+              )}
             </>
           )}
         </View>
@@ -565,6 +599,15 @@ export default function SettingsScreen() {
       <BoardingRatesModal
         isVisible={isBoardingRatesModalVisible}
         onClose={() => setIsBoardingRatesModalVisible(false)}
+        onRatesUpdated={() => {
+          // Optional: refresh data if needed
+        }}
+      />
+      
+      {/* Grooming Rates Modal */}
+      <GroomingRatesModal
+        isVisible={isGroomingRatesModalVisible}
+        onClose={() => setIsGroomingRatesModalVisible(false)}
         onRatesUpdated={() => {
           // Optional: refresh data if needed
         }}
