@@ -95,6 +95,7 @@ export interface Profile {
   bio?: string;
   location?: string;
   phoneNumber?: string;
+  service_type?: number;
 }
 
 // Types for addresses table
@@ -1067,4 +1068,90 @@ export const deletePortfolioImage = async (imageId: string, imageUrl: string): P
 // Helper utility to check if an error is a "no rows" error
 export const isNoRowsError = (error: any): boolean => {
   return error && error.code === 'PGRST116';
+};
+
+// Grooming info interface
+export interface GroomingInfo {
+  id: string;
+  sitter_id: string;
+  small_dog_rate: number;
+  medium_dog_rate: number;
+  large_dog_rate: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Helper function to get grooming info for a sitter
+export const getGroomingInfo = async (sitterId: string): Promise<GroomingInfo | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('grooming_info')
+      .select('*')
+      .eq('sitter_id', sitterId)
+      .single();
+    
+    if (error) {
+      if (isNoRowsError(error)) {
+        return null;
+      }
+      console.log('Error fetching grooming info:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.log('Error in getGroomingInfo:', error);
+    return null;
+  }
+};
+
+// Helper function to update grooming rates
+export const updateGroomingRates = async (
+  sitterId: string,
+  smallDogRate: number,
+  mediumDogRate: number,
+  largeDogRate: number
+): Promise<GroomingInfo | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('grooming_info')
+      .upsert({
+        sitter_id: sitterId,
+        small_dog_rate: smallDogRate,
+        medium_dog_rate: mediumDogRate,
+        large_dog_rate: largeDogRate
+      }, { onConflict: 'sitter_id' })
+      .select()
+      .single();
+    
+    if (error) {
+      console.log('Error updating grooming rates:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.log('Error in updateGroomingRates:', error);
+    return null;
+  }
+};
+
+// Helper function to update service type in profile
+export const updateServiceType = async (userId: string, serviceType: number): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ service_type: serviceType })
+      .eq('id', userId);
+    
+    if (error) {
+      console.log('Error updating service type:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.log('Error in updateServiceType:', error);
+    return false;
+  }
 };

@@ -54,7 +54,7 @@ export default function Register() {
       
       if (isAuthenticated) {
         // Successfully registered and authenticated
-        router.replace('/auth/profile-onboarding');
+        router.push('/auth/profile-onboarding');
       } else {
         // Email confirmation required
         console.log('Email confirmation required, redirecting to login screen');

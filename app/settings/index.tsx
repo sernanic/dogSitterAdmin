@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform, ToastAndroid } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,9 +16,11 @@ import BoardingRatesModal from '../../components/profile/BoardingRatesModal';
 import EditProfileModal from '../../components/profile/EditProfileModal';
 import AddressManagerModal from '../../components/profile/AddressManagerModal';
 import AvailabilityManagerModal from '../../components/profile/AvailabilityManagerModal';
+import GroomingAvailabilityManagerModal from '../../components/profile/GroomingAvailabilityManagerModal';
 import UnavailabilityManagerModal from '../../components/profile/UnavailabilityManagerModal';
 import PaymentSetupModal from '../../components/profile/PaymentSetupModal';
-import { getPrimaryAddress } from '../../lib/supabase';
+import { getPrimaryAddress, getProfileById } from '../../lib/supabase';
+import { SERVICE_TYPES } from '../../constants/serviceTypes';
 
 export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -28,6 +31,7 @@ export default function SettingsScreen() {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAvailabilityModalVisible, setIsAvailabilityModalVisible] = useState(false);
+  const [isGroomingAvailabilityModalVisible, setIsGroomingAvailabilityModalVisible] = useState(false);
   const [isUnavailabilityModalVisible, setIsUnavailabilityModalVisible] = useState(false);
   const [isPaymentSetupModalVisible, setIsPaymentSetupModalVisible] = useState(false);
   const [isPasswordChangeModalVisible, setIsPasswordChangeModalVisible] = useState(false);
@@ -270,8 +274,24 @@ export default function SettingsScreen() {
   };
   
   // Handle availability manager
-  const handleManageAvailability = () => {
-    setIsAvailabilityModalVisible(true);
+  const handleManageAvailability = async () => {
+    try {
+      if (!user?.id) return;
+      
+      // Get user's profile to check service type
+      const profile = await getProfileById(user.id);
+      
+      // Show appropriate modal based on service type
+      if (profile.service_type === SERVICE_TYPES.GROOMING) {
+        setIsGroomingAvailabilityModalVisible(true);
+      } else {
+        setIsAvailabilityModalVisible(true);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      // Default to regular availability modal if there's an error
+      setIsAvailabilityModalVisible(true);
+    }
   };
   
   // Handle unavailability manager
@@ -502,6 +522,13 @@ export default function SettingsScreen() {
       <AvailabilityManagerModal
         isVisible={isAvailabilityModalVisible}
         onClose={() => setIsAvailabilityModalVisible(false)}
+        onAvailabilityUpdated={() => {}}
+      />
+      
+      {/* Grooming Availability Manager Modal */}
+      <GroomingAvailabilityManagerModal
+        isVisible={isGroomingAvailabilityModalVisible}
+        onClose={() => setIsGroomingAvailabilityModalVisible(false)}
         onAvailabilityUpdated={() => {}}
       />
       

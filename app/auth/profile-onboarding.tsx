@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ImageBackground, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { ArrowLeft } from 'lucide-react-native';
 import EditProfileModal from '../../components/profile/EditProfileModal';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -105,7 +106,7 @@ export default function ProfileOnboardingScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.secondaryButton, { marginTop: 20 }]}
-            onPress={() => router.replace('/auth/payment-onboarding')}
+            onPress={() => router.push('/auth/payment-onboarding')}
           >
             <Text style={styles.secondaryButtonText}>Next</Text>
           </TouchableOpacity>
